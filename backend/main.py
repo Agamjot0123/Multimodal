@@ -3,8 +3,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from schemas import ChatRequest, ChatResponse, Citation
+from schemas import ChatRequest, ChatResponse
 from llm import generate_llm_response
+from guardrails import validate_and_sanitize_citations
 
 load_dotenv()
 
@@ -33,32 +34,25 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(request: ChatRequest, provider: str = "groq"):
     """
-    Generate an LLM response based on retrieved context chunks.
-    Pass query parameter ?provider=groq or ?provider=gemini.
+    Generate an LLM response and apply strict citation guardrails to strip hallucinations.
     """
     try:
-        # 1. Generate grounded answer
-        answer = generate_llm_response(
+        # 1. Generate raw response from LLM
+        raw_answer = generate_llm_response(
             query=request.query,
             contexts=request.retrieved_contexts,
             provider=provider
         )
         
-        # 2. Extract citations
-        citations = [
-            Citation(
-                chunk_id=c.chunk_id,
-                file_name=c.metadata.file_name,
-                page_number=c.metadata.page_number,
-                start_time=c.metadata.start_time,
-                end_time=c.metadata.end_time,
-            )
-            for c in request.retrieved_contexts
-        ]
+        # 2. Run Guardrail Parser & Sanitizer
+        clean_answer, verified_citations = validate_and_sanitize_citations(
+            answer=raw_answer,
+            retrieved_contexts=request.retrieved_contexts
+        )
 
         return ChatResponse(
-            answer=answer,
-            citations=citations
+            answer=clean_answer,
+            citations=verified_citations
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
