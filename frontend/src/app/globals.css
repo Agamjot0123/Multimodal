@@ -5,3 +5,22 @@ body {
   background: #020617;
   color: #f1f5f9;
 }
+
+/* Video.js: match app accent; cited-segment marker on the progress bar. */
+.video-js {
+  --sm-accent: #6366f1;
+  font-family: inherit;
+}
+.video-js .vjs-play-progress,
+.video-js .vjs-volume-level {
+  background-color: var(--sm-accent);
+}
+.video-js .vjs-progress-holder .sm-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgb(250 204 21 / 0.75);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+}

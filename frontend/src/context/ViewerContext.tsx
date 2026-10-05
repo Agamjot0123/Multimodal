@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Citation, CourseSource } from "@/types/contract";
+import { buildDeepLink, parseDeepLink } from "@/lib/deeplink";
 
 /** What the viewer pane should currently show. `nonce` forces re-seek on repeat clicks. */
 export interface ViewerTarget {
@@ -49,6 +50,23 @@ export function ViewerProvider({
   const openSource = useCallback((source: CourseSource) => {
     setTarget({ source, page_number: null, start_time: null, end_time: null, nonce: Date.now() });
   }, []);
+
+  // Deep link in: open ?src=…&t=… on first load.
+  useEffect(() => {
+    const link = parseDeepLink(window.location.search);
+    const source = link && sources.find((s) => s.file_name === link.file_name);
+    if (!link || !source) return;
+    const { page_number, start_time, end_time } = link;
+    setTarget({ source, page_number, start_time, end_time, nonce: Date.now() });
+  }, [sources]);
+
+  // Deep link out: mirror the open target in the URL (replace, so Back still leaves the app).
+  useEffect(() => {
+    if (!target) return;
+    const { source, page_number, start_time, end_time } = target;
+    const url = buildDeepLink({ file_name: source.file_name, page_number, start_time, end_time }, window.location.pathname);
+    window.history.replaceState(null, "", url);
+  }, [target]);
 
   const value = useMemo(
     () => ({ sources, target, openCitation, openSource }),

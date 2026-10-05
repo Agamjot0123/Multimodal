@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useViewer, type ViewerTarget } from "@/context/ViewerContext";
 import { formatTimestamp } from "@/lib/time";
+import { buildDeepLink } from "@/lib/deeplink";
+import type { VideoPlayerHandle } from "@/components/viewer/VideoPlayer";
+
+// Video.js touches `window` at import time, so load it client-side only.
+const VideoPlayer = dynamic(() => import("@/components/viewer/VideoPlayer").then((m) => m.VideoPlayer), {
+  ssr: false,
+  loading: () => <div className="aspect-video w-full animate-pulse rounded-lg bg-slate-900" />,
+});
 
 /**
  * Right pane. Switches between video and document views based on the active target.
- * Day 3: swap <BasicVideo> for the Video.js component (same props).
  * Day 5: swap <PdfPlaceholder> for the react-pdf viewer with highlight overlays.
  */
 export function ViewerPanel() {
@@ -31,7 +39,7 @@ export function ViewerPanel() {
         <TargetBadge target={target} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {source.kind === "video" ? <BasicVideo target={target} /> : <PdfPlaceholder target={target} />}
+        {source.kind === "video" ? <VideoView target={target} /> : <PdfPlaceholder target={target} />}
       </div>
     </div>
   );
@@ -46,30 +54,38 @@ function TargetBadge({ target }: { target: ViewerTarget }) {
   return <span className="shrink-0 rounded bg-indigo-500/15 px-2 py-0.5 text-xs text-indigo-300">{parts.join(" · ")}</span>;
 }
 
-/** Minimal HTML5 player with seek-on-citation. Re-seeks when `nonce` changes. */
-function BasicVideo({ target }: { target: ViewerTarget }) {
-  const ref = useRef<HTMLVideoElement>(null);
+/** Video.js player + controls for replaying the cited clip and sharing a timestamped link. */
+function VideoView({ target }: { target: ViewerTarget }) {
+  const player = useRef<VideoPlayerHandle>(null);
+  const [copied, setCopied] = useState(false);
+  const { start_time, end_time } = target;
 
-  useEffect(() => {
-    const v = ref.current;
-    if (!v || target.start_time == null) return;
-    const seek = () => {
-      v.currentTime = target.start_time!;
-      v.play().catch(() => {}); // autoplay may be blocked; seeking still works
-    };
-    if (v.readyState >= 1) seek();
-    else v.addEventListener("loadedmetadata", seek, { once: true });
-    return () => v.removeEventListener("loadedmetadata", seek);
-  }, [target.nonce, target.start_time]);
+  async function copyLink() {
+    const t = Math.floor(player.current?.getCurrentTime() ?? start_time ?? 0);
+    const url = buildDeepLink(
+      { file_name: target.source.file_name, page_number: null, start_time: t, end_time: null },
+      window.location.origin + window.location.pathname,
+    );
+    await navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
+  const btn = "rounded-md px-2.5 py-1 text-xs ring-1 ring-slate-700 hover:bg-slate-800";
   return (
-    <video
-      ref={ref}
-      src={target.source.url}
-      controls
-      preload="metadata"
-      className="aspect-video w-full rounded-lg bg-black"
-    />
+    <div className="space-y-3">
+      <VideoPlayer ref={player} src={target.source.url} start={start_time} end={end_time} nonce={target.nonce} />
+      <div className="flex flex-wrap gap-2">
+        {start_time != null && (
+          <button className={btn} onClick={() => player.current?.playSegment(start_time, end_time)}>
+            ↺ Replay cited clip
+          </button>
+        )}
+        <button className={btn} onClick={copyLink}>
+          {copied ? "✓ Link copied" : "🔗 Copy link at current time"}
+        </button>
+      </div>
+    </div>
   );
 }
 

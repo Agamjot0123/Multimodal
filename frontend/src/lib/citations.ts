@@ -35,23 +35,27 @@ export function segmentAnswer(text: string, known: Citation[]): Segment[] {
 const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 function looksLikeCitation(label: string) {
-  return /\b(slide|pg|page|p\.)\b|\d{1,2}:\d{2}/i.test(label);
+  return /\b(slide|pg|page|p\.|timestamp)\b|\d{1,2}:\d{2}/i.test(label);
 }
 
 /**
  * Best-effort parse for labels like "Slide 4, 02:15", "Textbook Pg 45",
- * "lecture2.mp4, 12:30-13:05". file_name stays as the hint text;
+ * "lecture2.mp4, 12:30-13:05", or the backend prompt format
+ * "lecture2.mp4 | Page: 4, Timestamp: 12:30-13:05". file_name stays as the hint text;
  * ViewerContext resolves it against the course source list.
  */
 export function heuristicParse(label: string): Citation | null {
-  const parts = label.split(",").map((p) => p.trim());
+  const parts = label
+    .split(/[,|]/)
+    .map((p) => p.trim().replace(/^(?:timestamp|time)\s*:\s*/i, "").replace(/\s*[-–]\s*$/, ""))
+    .filter(Boolean);
   let page: number | null = null;
   let start: number | null = null;
   let end: number | null = null;
   const nameHints: string[] = [];
 
   for (const p of parts) {
-    const pg = p.match(/\b(?:slide|pg|page|p\.)\s*(\d+)/i);
+    const pg = p.match(/\b(?:slide|pg|page|p\.)\s*:?\s*(\d+)/i);
     const range = p.match(/^(\d{1,2}(?::\d{2}){1,2})\s*[-–]\s*(\d{1,2}(?::\d{2}){1,2})$/);
     const ts = parseTimestamp(p);
 

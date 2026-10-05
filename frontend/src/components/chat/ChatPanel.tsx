@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_URL, streamChat } from "@/lib/sse";
+import { CHAT_URL, postChat, toCitation } from "@/lib/api";
 import { segmentAnswer } from "@/lib/citations";
 import { CitationChip } from "@/components/chat/CitationChip";
-import { MOCK_COURSE_ID } from "@/data/mockCourse";
+import { MOCK_CONTEXTS } from "@/data/mockCourse";
 import type { Citation } from "@/types/contract";
 
 interface Message {
@@ -24,7 +24,10 @@ export function ChatPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+  // Braces matter: scrollIntoView returns a Promise in newer browsers, which React rejects as a cleanup.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   async function ask(question: string) {
@@ -43,17 +46,15 @@ export function ChatPanel() {
 
     abortRef.current = new AbortController();
     try {
-      for await (const evt of streamChat(
+      const res = await postChat(
         CHAT_URL,
-        { question, course_id: MOCK_COURSE_ID, student_id: "demo" },
+        { query: question, retrieved_contexts: MOCK_CONTEXTS },
         abortRef.current.signal,
-      )) {
-        if (evt.type === "token") patch((msg) => ({ ...msg, text: msg.text + evt.text }));
-        else if (evt.type === "citation") patch((msg) => ({ ...msg, citations: [...msg.citations, evt.citation] }));
-        else if (evt.type === "error") patch((msg) => ({ ...msg, error: evt.message }));
-      }
+      );
+      patch((msg) => ({ ...msg, text: res.answer, citations: res.citations.map(toCitation) }));
     } catch (e) {
-      if ((e as Error).name !== "AbortError") patch((msg) => ({ ...msg, error: "Connection lost" }));
+      const err = e as Error;
+      if (err.name !== "AbortError") patch((msg) => ({ ...msg, error: err.message || "Connection lost" }));
     } finally {
       setBusy(false);
     }
@@ -83,11 +84,7 @@ export function ChatPanel() {
                 m.role === "user" ? "bg-indigo-600 text-white" : "bg-slate-900 ring-1 ring-slate-800"
               }`}
             >
-              {m.role === "assistant"
-                ? segmentAnswer(m.text, m.citations).map((seg, i) =>
-                    seg.kind === "text" ? <span key={i}>{seg.text}</span> : <CitationChip key={i} label={seg.label} citation={seg.citation} />,
-                  )
-                : m.text}
+              {m.role === "assistant" ? <AssistantBody text={m.text} citations={m.citations} /> : m.text}
               {m.role === "assistant" && !m.text && !m.error && <span className="animate-pulse text-slate-500">Thinking…</span>}
               {m.error && <p className="mt-1 text-xs text-rose-400">⚠ {m.error}</p>}
             </div>
@@ -114,5 +111,30 @@ export function ChatPanel() {
         </button>
       </form>
     </div>
+  );
+}
+
+/** Answer with inline chips, plus any backend citations the answer didn't reference inline. */
+function AssistantBody({ text, citations }: { text: string; citations: Citation[] }) {
+  const segments = segmentAnswer(text, citations);
+  const inlined = new Set(segments.flatMap((s) => (s.kind === "citation" && s.citation ? [s.citation.id] : [])));
+  const rest = citations.filter((c) => !inlined.has(c.id));
+
+  return (
+    <>
+      <span className="whitespace-pre-wrap">
+        {segments.map((seg, i) =>
+          seg.kind === "text" ? <span key={i}>{seg.text}</span> : <CitationChip key={i} label={seg.label} citation={seg.citation} />,
+        )}
+      </span>
+      {text && rest.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-slate-800 pt-2 text-xs text-slate-500">
+          Sources:
+          {rest.map((c) => (
+            <CitationChip key={c.id} label={c.label} citation={c} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
