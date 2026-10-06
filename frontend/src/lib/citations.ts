@@ -82,5 +82,6 @@ export function heuristicParse(label: string): Citation | null {
     page_number: page,
     start_time: start,
     end_time: end,
+    bboxes: [],
   };
 }

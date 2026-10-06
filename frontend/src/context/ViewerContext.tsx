@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { Citation, CourseSource } from "@/types/contract";
+import type { BBox, Citation, CourseSource } from "@/types/contract";
 import { buildDeepLink, parseDeepLink } from "@/lib/deeplink";
 
 /** What the viewer pane should currently show. `nonce` forces re-seek on repeat clicks. */
@@ -10,6 +10,7 @@ export interface ViewerTarget {
   page_number: number | null;
   start_time: number | null;
   end_time: number | null;
+  bboxes: BBox[]; // highlight regions on page_number
   nonce: number;
 }
 
@@ -40,6 +41,7 @@ export function ViewerProvider({
         page_number: c.page_number,
         start_time: c.start_time,
         end_time: c.end_time,
+        bboxes: c.bboxes,
         nonce: Date.now(),
       });
       return true;
@@ -48,7 +50,7 @@ export function ViewerProvider({
   );
 
   const openSource = useCallback((source: CourseSource) => {
-    setTarget({ source, page_number: null, start_time: null, end_time: null, nonce: Date.now() });
+    setTarget({ source, page_number: null, start_time: null, end_time: null, bboxes: [], nonce: Date.now() });
   }, []);
 
   // Deep link in: open ?src=…&t=… on first load.
@@ -56,15 +58,17 @@ export function ViewerProvider({
     const link = parseDeepLink(window.location.search);
     const source = link && sources.find((s) => s.file_name === link.file_name);
     if (!link || !source) return;
-    const { page_number, start_time, end_time } = link;
-    setTarget({ source, page_number, start_time, end_time, nonce: Date.now() });
+    setTarget({ ...link, source, nonce: Date.now() });
   }, [sources]);
 
   // Deep link out: mirror the open target in the URL (replace, so Back still leaves the app).
   useEffect(() => {
     if (!target) return;
-    const { source, page_number, start_time, end_time } = target;
-    const url = buildDeepLink({ file_name: source.file_name, page_number, start_time, end_time }, window.location.pathname);
+    const { source, page_number, start_time, end_time, bboxes } = target;
+    const url = buildDeepLink(
+      { file_name: source.file_name, page_number, start_time, end_time, bboxes },
+      window.location.pathname,
+    );
     window.history.replaceState(null, "", url);
   }, [target]);
 

@@ -52,6 +52,7 @@ def chat_endpoint(request: ChatRequest, provider: str = "groq"):
                 page_number=c.metadata.page_number,
                 start_time=c.metadata.start_time,
                 end_time=c.metadata.end_time,
+                bboxes=c.metadata.bboxes,
             )
             for c in request.retrieved_contexts
         ]

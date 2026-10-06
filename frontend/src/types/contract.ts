@@ -1,11 +1,23 @@
 /* ---------- Backend API contract — mirrors Backend/schemas.py exactly ---------- */
 
+/**
+ * Region on a PDF/slide page, in normalized page coordinates (0–1) with the origin
+ * at the page's top-left — independent of render size/zoom.
+ */
+export interface BBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 /** Source attribution metadata. Times are "mm:ss" strings (e.g. "02:15"). */
 export interface SourceMetadata {
   file_name: string;
   page_number: number | null;
   start_time: string | null;
   end_time: string | null;
+  bboxes?: BBox[] | null; // highlight regions on page_number
 }
 
 /** A retrieved chunk from Member 1's vector DB. */
@@ -28,6 +40,7 @@ export interface ApiCitation {
   page_number: number | null;
   start_time: string | null;
   end_time: string | null;
+  bboxes?: BBox[] | null;
 }
 
 /** POST /api/chat response body. */
@@ -61,4 +74,5 @@ export interface Citation {
   page_number: number | null;
   start_time: number | null; // seconds
   end_time: number | null; // seconds
+  bboxes: BBox[]; // highlight regions on page_number (empty if none)
 }

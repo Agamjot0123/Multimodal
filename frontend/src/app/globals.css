@@ -24,3 +24,21 @@ body {
   pointer-events: none;
   z-index: 1;
 }
+
+/* react-pdf: cited-region highlight over the page canvas (positioned in % by PdfViewer). */
+.sm-highlight {
+  position: absolute;
+  border-radius: 2px;
+  background: rgb(250 204 21 / 0.4);
+  mix-blend-mode: multiply; /* reads like a highlighter on the page, keeps text crisp */
+  box-shadow: 0 0 0 2px rgb(234 179 8 / 0.9);
+  animation: sm-highlight-pulse 1.6s ease-out 2;
+}
+@keyframes sm-highlight-pulse {
+  0% { box-shadow: 0 0 0 2px rgb(234 179 8 / 0.9), 0 0 0 0 rgb(234 179 8 / 0.6); }
+  70% { box-shadow: 0 0 0 2px rgb(234 179 8 / 0.9), 0 0 0 10px rgb(234 179 8 / 0); }
+  100% { box-shadow: 0 0 0 2px rgb(234 179 8 / 0.9), 0 0 0 0 rgb(234 179 8 / 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-highlight { animation: none; }
+}

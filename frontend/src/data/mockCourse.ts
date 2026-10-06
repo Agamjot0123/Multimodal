@@ -42,14 +42,31 @@ export const MOCK_CONTEXTS: ContextChunk[] = [
   {
     chunk_id: "lec03-s-04",
     text: "Slide 4 — Backprop = chain rule + caching. dL/dw = (upstream gradient) × (local gradient).",
-    metadata: { file_name: "lecture_03_slides.pdf", page_number: 4, start_time: null, end_time: null },
+    metadata: {
+      file_name: "lecture_03_slides.pdf",
+      page_number: 4,
+      start_time: null,
+      end_time: null,
+      bboxes: [{ x0: 0.08, y0: 0.32, x1: 0.92, y1: 0.48 }],
+    },
   },
   {
     chunk_id: "dl-tb-045",
     text:
       "The gradient of the loss with respect to a weight equals the product of the upstream gradient " +
       "flowing into the unit and the local gradient of the unit's output with respect to that weight.",
-    metadata: { file_name: "deep_learning_textbook.pdf", page_number: 45, start_time: null, end_time: null },
+    metadata: {
+      file_name: "deep_learning_textbook.pdf",
+      page_number: 45,
+      start_time: null,
+      end_time: null,
+      // A passage that wraps across lines → one box per line.
+      bboxes: [
+        { x0: 0.42, y0: 0.38, x1: 0.88, y1: 0.405 },
+        { x0: 0.12, y0: 0.405, x1: 0.88, y1: 0.43 },
+        { x0: 0.12, y0: 0.43, x1: 0.55, y1: 0.455 },
+      ],
+    },
   },
 ];
 

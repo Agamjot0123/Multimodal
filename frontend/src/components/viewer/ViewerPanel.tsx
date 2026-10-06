@@ -13,10 +13,13 @@ const VideoPlayer = dynamic(() => import("@/components/viewer/VideoPlayer").then
   loading: () => <div className="aspect-video w-full animate-pulse rounded-lg bg-slate-900" />,
 });
 
-/**
- * Right pane. Switches between video and document views based on the active target.
- * Day 5: swap <PdfPlaceholder> for the react-pdf viewer with highlight overlays.
- */
+// pdf.js needs browser APIs (canvas, workers), so the same applies.
+const PdfViewer = dynamic(() => import("@/components/viewer/PdfViewer").then((m) => m.PdfViewer), {
+  ssr: false,
+  loading: () => <div className="mx-auto aspect-[3/4] w-full max-w-2xl animate-pulse rounded-md bg-slate-900" />,
+});
+
+/** Right pane. Switches between video and document views based on the active target. */
 export function ViewerPanel() {
   const { target } = useViewer();
 
@@ -39,7 +42,11 @@ export function ViewerPanel() {
         <TargetBadge target={target} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {source.kind === "video" ? <VideoView target={target} /> : <PdfPlaceholder target={target} />}
+        {source.kind === "video" ? (
+          <VideoView target={target} />
+        ) : (
+          <PdfViewer src={source.url} page={target.page_number} bboxes={target.bboxes} nonce={target.nonce} />
+        )}
       </div>
     </div>
   );
@@ -63,7 +70,7 @@ function VideoView({ target }: { target: ViewerTarget }) {
   async function copyLink() {
     const t = Math.floor(player.current?.getCurrentTime() ?? start_time ?? 0);
     const url = buildDeepLink(
-      { file_name: target.source.file_name, page_number: null, start_time: t, end_time: null },
+      { file_name: target.source.file_name, page_number: null, start_time: t, end_time: null, bboxes: [] },
       window.location.origin + window.location.pathname,
     );
     await navigator.clipboard.writeText(url).catch(() => {});
@@ -84,18 +91,6 @@ function VideoView({ target }: { target: ViewerTarget }) {
         <button className={btn} onClick={copyLink}>
           {copied ? "✓ Link copied" : "🔗 Copy link at current time"}
         </button>
-      </div>
-    </div>
-  );
-}
-
-function PdfPlaceholder({ target }: { target: ViewerTarget }) {
-  return (
-    <div className="mx-auto grid aspect-[3/4] max-w-md place-items-center rounded-lg border border-dashed border-slate-700 text-center text-sm text-slate-400">
-      <div>
-        <p className="text-4xl font-bold text-slate-200">{target.page_number ?? 1}</p>
-        <p className="mt-1">{target.source.file_name}</p>
-        <p className="mt-4 text-xs text-slate-500">react-pdf viewer + highlights land on Day 5</p>
       </div>
     </div>
   );

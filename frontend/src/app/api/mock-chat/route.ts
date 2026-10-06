@@ -8,7 +8,8 @@ export const runtime = "edge";
 
 const ANSWER =
   "Backpropagation applies the chain rule layer by layer, reusing each layer's local gradient " +
-  "instead of recomputing it [lecture_03_backprop.mp4 | Timestamp: 02:15-02:52]. Formally, the gradient " +
+  "instead of recomputing it [lecture_03_backprop.mp4 | Timestamp: 02:15-02:52] — in short, upstream " +
+  "gradient × local gradient [lecture_03_slides.pdf | Page: 4]. Formally, the gradient " +
   "of the loss with respect to a weight is the product of upstream and local gradients " +
   "[deep_learning_textbook.pdf | Page: 45].";
 

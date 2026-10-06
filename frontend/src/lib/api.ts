@@ -1,5 +1,6 @@
 import type { ApiCitation, ChatRequest, ChatResponse, Citation } from "@/types/contract";
 import { parseTimestamp } from "@/lib/time";
+import { cleanBoxes } from "@/lib/bbox";
 
 /** POST /api/chat → { answer, citations }. Throws with the backend's `detail` on failure. */
 export async function postChat(url: string, body: ChatRequest, signal?: AbortSignal): Promise<ChatResponse> {
@@ -36,6 +37,7 @@ export function toCitation(c: ApiCitation): Citation {
     page_number: c.page_number,
     start_time: c.start_time !== null ? parseTimestamp(c.start_time) : null,
     end_time: c.end_time !== null ? parseTimestamp(c.end_time) : null,
+    bboxes: cleanBoxes(c.bboxes),
   };
 }
 
