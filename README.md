@@ -24,3 +24,10 @@ source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 http://127.0.0.1:8000/docs
+
+## 🔌 API Documentation
+For detailed backend endpoint specifications, request/response schemas, and cURL testing examples, see the [Backend API Specs](./backend/API_DOCS.md).
+
+curl -X 'GET' \
+  '[https://multimodal-tutor-backend.onrender.com/](https://multimodal-tutor-backend.onrender.com/)' \
+  -H 'accept: application/json'
