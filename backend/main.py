@@ -17,14 +17,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Updated CORS configuration for local and production frontends
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.vercel.app",  # Production Vercel wildcards
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
