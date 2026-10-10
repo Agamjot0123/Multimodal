@@ -1,10 +1,12 @@
 import os
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 
-from schemas import ChatRequest, ChatResponse
-from llm import generate_llm_response
+from schemas import ChatRequest, ChatResponse, QuizRequest, QuizResponse
+from llm import stream_llm_response, generate_quiz_json
 from guardrails import validate_and_sanitize_citations
 
 load_dotenv()
@@ -36,29 +38,30 @@ def health_check():
         "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY"))
     }
 
-@app.post("/api/chat", response_model=ChatResponse)
-def chat_endpoint(request: ChatRequest, provider: str = "groq"):
+@app.post("/api/chat/stream")
+def chat_stream_endpoint(request: ChatRequest, provider: str = "groq"):
     """
-    Generate an LLM response and apply strict citation guardrails to strip hallucinations.
+    Server-Sent Events (SSE) streaming endpoint for real-time word-by-word responses.
+    """
+    def event_generator():
+        for token in stream_llm_response(request.query, request.retrieved_contexts, provider):
+            yield f"data: {json.dumps({'token': token})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/api/quiz", response_model=QuizResponse)
+def quiz_endpoint(request: QuizRequest, provider: str = "groq"):
+    """
+    Generates a structured multiple-choice quiz based on course material.
     """
     try:
-        # 1. Generate raw response from LLM
-        raw_answer = generate_llm_response(
-            query=request.query,
+        quiz_data = generate_quiz_json(
             contexts=request.retrieved_contexts,
+            num_questions=request.num_questions,
             provider=provider
         )
-        
-        # 2. Run Guardrail Parser & Sanitizer
-        clean_answer, verified_citations = validate_and_sanitize_citations(
-            answer=raw_answer,
-            retrieved_contexts=request.retrieved_contexts
-        )
-
-        return ChatResponse(
-            answer=clean_answer,
-            citations=verified_citations
-        )
+        return quiz_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

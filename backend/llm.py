@@ -1,5 +1,6 @@
 import os
-from typing import List
+import json
+from typing import List, Generator
 from groq import Groq
 from google import genai
 from schemas import ContextChunk
@@ -12,7 +13,6 @@ def format_context_for_prompt(contexts: List[ContextChunk]) -> str:
     formatted_chunks = []
     for c in contexts:
         meta = c.metadata
-        # Create citation tag instruction for LLM
         if meta.page_number is not None:
             cite_tag = f"[Source: {meta.file_name}, Pg {meta.page_number}]"
         elif meta.start_time is not None:
@@ -30,8 +30,8 @@ def format_context_for_prompt(contexts: List[ContextChunk]) -> str:
     return "\n\n".join(formatted_chunks)
 
 
-def generate_llm_response(query: str, contexts: List[ContextChunk], provider: str = "groq") -> str:
-    """Generates an answer grounded in course material with strict inline Markdown citations."""
+def stream_llm_response(query: str, contexts: List[ContextChunk], provider: str = "groq") -> Generator[str, None, None]:
+    """Streams LLM tokens word-by-word via Server-Sent Events (SSE)."""
     context_str = format_context_for_prompt(contexts)
     
     system_prompt = """You are an expert AI tutor. Answer the student's question using ONLY the provided course context chunks.
@@ -42,52 +42,81 @@ CRITICAL CITATION RULES:
    - For PDFs/Slides: [Source: file_name, Pg X]
    - For Videos: [Source: file_name, MM:SS]
 3. DO NOT invent citations or cite sources not provided in the context.
-4. If the provided context does not contain enough information to answer the question, state: "The provided course materials do not contain sufficient information to answer this question."
 """
 
-    user_prompt = f"""--- COURSE CONTEXT ---
-{context_str}
-
---- STUDENT QUESTION ---
-{query}
-
---- ANSWER ---
-"""
+    user_prompt = f"--- COURSE CONTEXT ---\n{context_str}\n\n--- STUDENT QUESTION ---\n{query}\n\n--- ANSWER ---"
 
     if provider.lower() == "groq":
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        models_to_try = [
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b"
-        ]
+        models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
         
-        last_exception = None
         for model_id in models_to_try:
             try:
-                chat_completion = client.chat.completions.create(
+                stream = client.chat.completions.create(
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
                     model=model_id,
                     temperature=0.1,
+                    stream=True,
                 )
-                return chat_completion.choices[0].message.content
-            except Exception as e:
-                last_exception = e
+                for chunk in stream:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
+                return
+            except Exception:
                 continue
-                
-        raise RuntimeError(f"All Groq models failed. Last error: {last_exception}")
 
     elif provider.lower() == "gemini":
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        response = client.models.generate_content_stream(
+            model="gemini-2.5-flash",
+            contents=f"{system_prompt}\n\n{user_prompt}",
+        )
+        for chunk in response:
+            yield chunk.text
+
+
+def generate_quiz_json(contexts: List[ContextChunk], num_questions: int = 3, provider: str = "groq") -> dict:
+    """Generates structured multiple-choice quiz questions based on retrieved course chunks."""
+    context_str = format_context_for_prompt(contexts)
+    
+    prompt = f"""You are an expert tutor. Generate exactly {num_questions} multiple-choice quiz questions based ONLY on the context below.
+
+--- COURSE CONTEXT ---
+{context_str}
+
+Respond with strictly valid JSON using this format (no markdown formatting around the JSON):
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_option_index": 0,
+      "explanation": "Explanation here",
+      "source_citation": "[Source: file_name, Pg X]"
+    }}
+  ]
+}}
+"""
+
+    if provider.lower() == "groq":
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+        return json.loads(completion.choices[0].message.content)
+    else:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=full_prompt,
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
         )
-        return response.text
-
-    else:
-        raise ValueError("Unsupported provider. Choose 'groq' or 'gemini'.")
+        return json.loads(response.text)
