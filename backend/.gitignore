@@ -1,6 +1,16 @@
-venv/
-.venv/
-__pycache__/
-*.pyc
+# Environment Variables (CRITICAL)
 .env
 .env.local
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Local Vector Database & Caches
+chroma_db/
+__pycache__/
+*.pyc
+
+# Temporary or seed scripts
+ingest.py

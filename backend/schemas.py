@@ -45,3 +45,30 @@ class QuizQuestion(BaseModel):
 
 class QuizResponse(BaseModel):
     questions: List[QuizQuestion]
+
+# --- Community Schemas ---
+class CreateCommunityRequest(BaseModel):
+    name: str = Field(..., example="Machine Learning 101")
+    description: Optional[str] = Field(None, example="Study group for CS229")
+
+class CommunityResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    owner_id: str
+    invite_code: str
+
+class JoinCommunityRequest(BaseModel):
+    invite_code: str = Field(..., example="COMM-8X92")
+
+class CommunityResource(BaseModel):
+    id: str
+    file_name: str
+    file_type: str  # 'pdf' or 'video'
+    community_id: str
+
+class ChatSession(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    community_id: Optional[str] = None

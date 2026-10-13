@@ -120,3 +120,43 @@ Respond with strictly valid JSON using this format (no markdown formatting aroun
             config={"response_mime_type": "application/json"}
         )
         return json.loads(response.text)
+
+def generate_llm_response(query: str, contexts: List[ContextChunk], provider: str = "groq") -> str:
+    """Generates a synchronous non-streaming answer from the LLM."""
+    context_str = format_context_for_prompt(contexts)
+    
+    system_prompt = """You are an expert AI tutor. Answer the student's question using ONLY the provided course context chunks.
+
+CRITICAL CITATION RULES:
+1. Every factual statement or claim MUST be immediately followed by its corresponding Required Citation Tag.
+2. Exact Citation Formats:
+   - For PDFs/Slides:
+   - For Videos:
+3. DO NOT invent citations or cite sources not provided in the context.
+"""
+    user_prompt = f"--- COURSE CONTEXT ---\n{context_str}\n\n--- STUDENT QUESTION ---\n{query}\n\n--- ANSWER ---"
+
+    if provider.lower() == "groq":
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        for model_id in models_to_try:
+            try:
+                completion = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    model=model_id,
+                    temperature=0.1,
+                )
+                return completion.choices[0].message.content
+            except Exception:
+                continue
+        raise Exception("All Groq models failed.")
+    else:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"{system_prompt}\n\n{user_prompt}",
+        )
+        return response.text
