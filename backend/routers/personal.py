@@ -1,12 +1,13 @@
 import mimetypes
 from uuid import uuid4
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from postgrest.exceptions import APIError
 from typing import List
 from schemas import CommunityResource
 from auth import get_current_user, AuthenticatedUser
 from db import get_db
 from routers.communities import read_upload
+from ingestion_bridge import index_upload
 
 router = APIRouter(prefix="/api/personal", tags=["Personal"])
 
@@ -31,6 +32,7 @@ def list_personal_resources(current_user: AuthenticatedUser = Depends(get_curren
 
 @router.post("/resources/upload", response_model=CommunityResource)
 async def upload_personal_resource(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
@@ -54,6 +56,15 @@ async def upload_personal_resource(
         "storage_path": f"{BUCKET}/{path}",
         "processing_status": "uploaded",
     }).execute().data[0]
+
+    def set_status(status: str, error: str | None):
+        db.table("documents").update({"processing_status": status, "error_message": error}).eq("id", doc_id).execute()
+
+    # Index in the background so chat can answer from this file once it finishes.
+    background_tasks.add_task(
+        index_upload, data, name, file_type,
+        user_id=current_user.id, document_id=doc_id, status=set_status,
+    )
     return _to_resource(row)
 
 

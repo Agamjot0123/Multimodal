@@ -1,7 +1,7 @@
 import mimetypes
 import re
 from uuid import uuid4
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from typing import List
 from postgrest.exceptions import APIError
 from schemas import (
@@ -11,6 +11,7 @@ from schemas import (
 from auth import get_current_user, AuthenticatedUser
 from utils import generate_invite_code
 from db import get_db
+from ingestion_bridge import index_upload
 
 router = APIRouter(prefix="/api/communities", tags=["Communities"])
 
@@ -207,6 +208,7 @@ async def read_upload(file: UploadFile) -> tuple[str, str, bytes]:
 @router.post("/{id}/resources/upload", response_model=CommunityResource)
 async def upload_community_resource(
     id: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
@@ -230,6 +232,11 @@ async def upload_community_resource(
         "storage_path": f"{BUCKET}/{path}",
         "uploaded_by": current_user.id,
     }).execute().data[0]
+    # Index in the background so chat can answer from this file once it finishes.
+    background_tasks.add_task(
+        index_upload, data, name, file_type,
+        user_id=current_user.id, document_id=row["id"], community_id=id,
+    )
     return CommunityResource(**row)
 
 

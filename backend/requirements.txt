@@ -107,3 +107,9 @@ websockets==15.0.1
 yarl==1.25.1
 PyJWT==2.15.1
 python-multipart==0.0.20
+# Ingestion pipeline (ingestion/scripts)
+pymupdf==1.28.2
+tiktoken==0.14.0
+sentence-transformers==6.1.0
+rank-bm25==0.2.2
+faster-whisper==1.2.1
