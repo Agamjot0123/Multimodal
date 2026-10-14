@@ -283,15 +283,15 @@ def delete_community_resource(
     resource_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    """Deletes a community resource and all of its indexed chunks."""
+    """Deletes a shared file and all of its indexed chunks."""
+    community = _get_community(id)
     if not _is_member(id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied.")
-
     db = get_db()
     try:
         rows = (
             db.table("resources")
-            .select("id,storage_path")
+            .select("id,storage_path,uploaded_by")
             .eq("id", resource_id)
             .eq("community_id", id)
             .neq("processing_status", "deleted")
@@ -302,11 +302,13 @@ def delete_community_resource(
         if e.code != INVALID_UUID:
             raise
         rows = []
-
     if not rows:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
     resource = rows[0]
+    if current_user.id not in (resource.get("uploaded_by"), community.get("owner_id")):
+        raise HTTPException(status_code=403, detail="Only the uploader or community owner can delete this file.")
+
     db.table("resources").update({
         "processing_status": "deleting",
         "error_message": None,
@@ -318,9 +320,10 @@ def delete_community_resource(
         community_id=id,
     )
 
-    bucket, _, storage_path = resource["storage_path"].partition("/")
-    if bucket and storage_path:
-        db.storage.from_(bucket).remove([storage_path])
+    if resource.get("storage_path"):
+        bucket, _, path = resource["storage_path"].partition("/")
+        if bucket and path:
+            db.storage.from_(bucket).remove([path])
 
     db.table("resources").update({
         "processing_status": "deleted",

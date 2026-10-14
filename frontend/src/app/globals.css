@@ -3,6 +3,7 @@
 @theme inline {
   --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-wordmark: var(--font-fraunces), Georgia, serif;
   --font-reading: var(--font-newsreader), Georgia, "Times New Roman", serif;
 }
 

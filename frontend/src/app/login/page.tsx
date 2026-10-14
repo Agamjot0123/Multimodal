@@ -50,8 +50,8 @@ function SignIn() {
   return (
     <div className="w-full max-w-sm">
       <div className="flex items-center gap-2.5">
-        <span className="grid size-8 place-items-center rounded-lg bg-indigo-500 text-base font-bold text-white">S</span>
-        <span className="text-lg font-semibold tracking-tight">StudyMate</span>
+        <img src="/logo.png" alt="" className="size-8 rounded-lg" />
+        <span className="font-[family-name:var(--font-wordmark)] text-xl font-bold tracking-tight">AnchorLearn</span>
       </div>
 
       <h1 className={"mt-10 text-5xl font-bold leading-[1.02] tracking-tighter text-slate-50 sm:text-6xl"}>

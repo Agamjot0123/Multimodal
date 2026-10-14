@@ -1,9 +1,13 @@
 
 from pathlib import Path
 
+import math
+
 import chromadb
+from google.genai import types
 from rank_bm25 import BM25Okapi
-from sentence_transformers import SentenceTransformer
+
+from ingestion.scripts.gemini_ocr import get_gemini_client
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -11,13 +15,41 @@ DB_PATH = PROJECT_ROOT / "ingestion" / "data" / "chroma_db"
 
 client = chromadb.PersistentClient(path=str(DB_PATH))
 
-# Keep the existing collection intact.
+# Embeddings come from the Gemini API (no local model, so the server stays small).
+# The collection name encodes the model and size: vectors of different dimensions
+# cannot share a collection, so the old MiniLM collection is left untouched.
+EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_DIMENSIONS = 768
+EMBED_BATCH_SIZE = 100
+
 collection = client.get_or_create_collection(
-    name="course_material_scoped",
+    name="course_material_scoped_gemini768",
     metadata={"hnsw:space": "cosine"},
 )
 
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def embed_texts(texts: list[str], *, is_query: bool = False) -> list[list[float]]:
+    """Embed texts with Gemini, as unit-length vectors."""
+    task_type = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
+    vectors = []
+
+    for start in range(0, len(texts), EMBED_BATCH_SIZE):
+        response = get_gemini_client().models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=texts[start:start + EMBED_BATCH_SIZE],
+            config=types.EmbedContentConfig(
+                task_type=task_type,
+                output_dimensionality=EMBEDDING_DIMENSIONS,
+            ),
+        )
+
+        for embedding in response.embeddings:
+            values = list(embedding.values)
+            # Truncated Gemini embeddings are not normalized by default.
+            norm = math.sqrt(sum(v * v for v in values)) or 1.0
+            vectors.append([v / norm for v in values])
+
+    return vectors
 
 
 def add_chunks(
@@ -94,10 +126,7 @@ def add_chunks(
     if not documents:
         return 0
 
-    embeddings = embedding_model.encode(
-        documents,
-        normalize_embeddings=True,
-    ).tolist()
+    embeddings = embed_texts(documents)
 
     collection.upsert(
         ids=ids,
@@ -107,6 +136,15 @@ def add_chunks(
     )
 
     return len(documents)
+
+
+def delete_document_chunks(document_id: str) -> None:
+    """Remove every indexed chunk that belongs to one document."""
+
+    if not document_id.strip():
+        raise ValueError("document_id must not be empty")
+
+    collection.delete(where={"document_id": document_id})
 
 
 def get_relevant_chunks(
@@ -159,10 +197,7 @@ def get_relevant_chunks(
     if not documents:
         return []
 
-    query_embedding = embedding_model.encode(
-        [query],
-        normalize_embeddings=True,
-    ).tolist()
+    query_embedding = embed_texts([query], is_query=True)
 
     vector_results = collection.query(
         query_embeddings=query_embedding,

@@ -24,7 +24,7 @@ export function SourcesPanel() {
         {sources.map((s) => {
           const active = target?.source.file_name === s.file_name;
           return (
-            <li key={s.file_name}>
+            <li key={s.resource_id ?? s.file_name}>
               <button
                 onClick={() => openSource(s)}
                 className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition ${

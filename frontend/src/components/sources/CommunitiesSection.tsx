@@ -162,16 +162,13 @@ export function CommunitiesSection() {
                     <span className="text-slate-500">{r.file_type === "video" ? "▶" : r.file_type === "image" ? "▣" : "❐"}</span>
                     <span className="min-w-0 flex-1 truncate">{r.file_name}</span>
                     <button
-                      type="button"
                       disabled={busy}
-                      onClick={() => {
-                        if (confirm(`Delete ${r.file_name}?`)) {
-                          run(() => deleteResource(r));
-                        }
-                      }}
-                      className="shrink-0 text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                      title="Delete file"
+                      aria-label={`Delete ${r.file_name}`}
+                      onClick={() => confirm(`Delete ${r.file_name}?`) && run(() => deleteResource(r.id))}
+                      className="text-slate-500 hover:text-red-400 disabled:opacity-50"
                     >
-                      Delete
+                      ✕
                     </button>
                   </li>
                 ))}

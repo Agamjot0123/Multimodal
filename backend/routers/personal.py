@@ -92,6 +92,7 @@ def delete_personal_resource(
     resource_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    """Deletes one of the caller's own files and all of its indexed chunks."""
     db = get_db()
 
     try:

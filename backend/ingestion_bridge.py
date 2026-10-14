@@ -78,6 +78,16 @@ def search_chunks(query: str, user_id: str, community_ids: List[str], top_k: int
     return chunks
 
 
+def delete_indexed(document_id: str) -> None:
+    """Drops a deleted file's chunks from the index so chat stops citing it."""
+    try:
+        from ingestion.scripts.retrieval import delete_document_chunks
+
+        delete_document_chunks(document_id)
+    except Exception:
+        log.exception("Failed to remove index entries for %s", document_id)
+
+
 def index_upload(
     data: bytes,
     name: str,

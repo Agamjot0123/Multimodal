@@ -42,8 +42,8 @@ export function AppShell() {
     <div className="flex h-dvh flex-col bg-slate-950 text-slate-100">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-800 px-4">
         <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-md bg-indigo-500 text-sm font-bold">S</span>
-          <span className="font-semibold tracking-tight">StudyMate</span>
+          <img src="/logo.png" alt="" className="size-7 rounded-md" />
+          <span className="font-[family-name:var(--font-wordmark)] text-lg font-bold tracking-tight">AnchorLearn</span>
         </div>
         <nav aria-label="View" className="flex gap-1 rounded-full border border-slate-800 bg-slate-900/70 p-0.5 text-xs">
           {(["home", "workspace"] as View[]).map((v) => (
