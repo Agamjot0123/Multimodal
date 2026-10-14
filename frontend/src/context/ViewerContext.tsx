@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Citation, CourseSource, HighlightRect } from "@/types/contract";
 import { useCommunities } from "@/context/CommunityContext";
 import { communitiesApi, personalApi } from "@/lib/api";
@@ -40,6 +40,12 @@ export function ViewerProvider({ children }: { children: React.ReactNode }) {
     [resources],
   );
   const [target, setTarget] = useState<ViewerTarget | null>(null);
+
+  // Close the viewer if its file was deleted.
+  useEffect(() => {
+    const id = target?.source.resource_id;
+    if (id && !sources.some((s) => s.resource_id === id)) setTarget(null);
+  }, [sources, target]);
 
   const openCitation = useCallback(
     (c: Citation) => {

@@ -1,4 +1,4 @@
-# StudyMate Web (Member 3 · Frontend)
+# AnchorLearn Web (Member 3 · Frontend)
 
 Next.js 15 (App Router) + TypeScript + Tailwind v4. A 3-pane tutor UI: **Sources | Chat | Viewer**.
 

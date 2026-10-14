@@ -180,7 +180,7 @@ export function HomeView({ onStart }: { onStart: (mode: Start) => void }) {
               <h2 className="text-3xl font-bold tracking-tight text-slate-50">Your materials</h2>
               <ul className="mt-5 border-t border-slate-800/80">
                 {sources.map((s) => (
-                  <li key={s.file_name} className="border-b border-slate-800/80">
+                  <li key={s.resource_id ?? s.file_name} className="border-b border-slate-800/80">
                     <button
                       onClick={() => open(s.file_name)}
                       className="group flex w-full items-baseline justify-between gap-4 py-3.5 text-left"
