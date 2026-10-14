@@ -31,7 +31,14 @@ export function ViewerPanel() {
         <TargetBadge target={target} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {source.kind === "video" ? <VideoPlayer target={target} /> : <PdfViewer target={target} />}
+        {source.kind === "video" ? (
+          <VideoPlayer target={target} />
+        ) : source.kind === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={source.url} alt={source.title} className="mx-auto max-h-full max-w-full rounded-lg" />
+        ) : (
+          <PdfViewer target={target} />
+        )}
       </div>
     </div>
   );

@@ -145,7 +145,7 @@ export function CommunitiesSection() {
                 ref={fileRef}
                 type="file"
                 hidden
-                accept=".pdf,.mp4,.webm,.mov,application/pdf,video/*"
+                accept=".pdf,.png,.jpg,.jpeg,.mp4,.webm,.mov,application/pdf,image/png,image/jpeg,video/*"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
@@ -159,7 +159,7 @@ export function CommunitiesSection() {
               <ul className="space-y-1">
                 {resources.map((r) => (
                   <li key={r.id} className="flex items-center gap-2 text-slate-300">
-                    <span className="text-slate-500">{r.file_type === "video" ? "▶" : "❐"}</span>
+                    <span className="text-slate-500">{r.file_type === "video" ? "▶" : r.file_type === "image" ? "▣" : "❐"}</span>
                     <span className="truncate">{r.file_name}</span>
                   </li>
                 ))}

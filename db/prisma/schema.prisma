@@ -11,6 +11,7 @@ datasource db {
 enum ResourceType {
   pdf
   video
+  image
 }
 
 model Community {

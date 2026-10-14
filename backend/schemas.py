@@ -69,7 +69,7 @@ class CommunityResource(BaseModel):
 
 class CreateResourceRequest(BaseModel):
     file_name: str
-    file_type: Literal["pdf", "video"]
+    file_type: Literal["pdf", "video", "image"]
     storage_path: Optional[str] = None
 
 class ChatSession(BaseModel):

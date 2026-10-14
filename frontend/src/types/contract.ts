@@ -19,7 +19,7 @@ export interface HighlightRect {
   h: number;
 }
 
-export type SourceKind = "video" | "pdf" | "slides";
+export type SourceKind = "video" | "pdf" | "slides" | "image";
 
 /** A course material file shown in the Sources pane. */
 export interface CourseSource {

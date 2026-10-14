@@ -31,7 +31,7 @@ export function ViewerProvider({ children }: { children: React.ReactNode }) {
     () =>
       resources.map((r) => ({
         file_name: r.file_name,
-        kind: r.file_type === "video" ? "video" : "pdf",
+        kind: r.file_type === "video" ? "video" : r.file_type === "image" ? "image" : "pdf",
         title: r.file_name,
         url: "",
         resource_id: r.id,

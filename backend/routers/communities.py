@@ -180,18 +180,21 @@ def add_community_resource(
 BUCKET = "community-materials"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 VIDEO_EXTS = {".mp4", ".webm", ".mov"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg"}
 
 
 async def read_upload(file: UploadFile) -> tuple[str, str, bytes]:
-    """Validates an uploaded PDF/video and returns (safe_name, file_type, bytes)."""
+    """Validates an uploaded PDF/image/video and returns (safe_name, file_type, bytes)."""
     name = re.sub(r"[^\w.\- ]", "_", (file.filename or "").split("/")[-1]).strip()
     ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
     if ext == ".pdf":
         file_type = "pdf"
     elif ext in VIDEO_EXTS:
         file_type = "video"
+    elif ext in IMAGE_EXTS:
+        file_type = "image"
     else:
-        raise HTTPException(status_code=400, detail="Only PDF or video (mp4, webm, mov) files are supported.")
+        raise HTTPException(status_code=400, detail="Only PDF, image (png, jpg) or video (mp4, webm, mov) files are supported.")
 
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if not data:

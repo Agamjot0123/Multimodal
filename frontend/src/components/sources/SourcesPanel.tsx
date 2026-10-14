@@ -6,7 +6,7 @@ import { CommunitiesSection } from "@/components/sources/CommunitiesSection";
 import { MasteryRadar } from "@/components/mastery/MasteryRadar";
 import type { SourceKind } from "@/types/contract";
 
-const ICON: Record<SourceKind, string> = { video: "▶", slides: "▤", pdf: "❐" };
+const ICON: Record<SourceKind, string> = { video: "▶", slides: "▤", pdf: "❐", image: "▣" };
 
 export function SourcesPanel() {
   const { sources, target, openSource } = useViewer();
