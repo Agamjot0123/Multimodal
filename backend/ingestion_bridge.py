@@ -156,3 +156,47 @@ def delete_indexed_document(
     except Exception:
         log.exception("Failed to delete indexed document %s", document_id)
         raise
+
+
+def reindex_missing() -> None:
+    """Rebuilds the search index for files that are stored but no longer indexed.
+
+    The ChromaDB index lives on the server's local disk, which is wiped on every restart or
+    redeploy on hosts without a persistent disk, while the files and their rows live in Supabase.
+    Run once at startup (in a background thread): any file that is not deleted but has no chunks
+    in the index is downloaded again and re-indexed.
+    """
+    try:
+        from db import get_db
+        from ingestion.scripts.retrieval import collection
+
+        db = get_db()
+        # (table, owner column, community id column or None)
+        jobs = []
+        for row in db.table("documents").select("id,owner_id,file_name,file_type,storage_path,processing_status") \
+                .in_("processing_status", ["completed", "processing", "uploaded"]).execute().data:
+            jobs.append(("documents", row, row["owner_id"], None))
+        for row in db.table("resources").select("id,uploaded_by,community_id,file_name,file_type,storage_path,processing_status") \
+                .in_("processing_status", ["completed", "processing", "uploaded"]).execute().data:
+            if row.get("uploaded_by") and row.get("storage_path"):
+                jobs.append(("resources", row, row["uploaded_by"], row["community_id"]))
+
+        for table, row, owner, community_id in jobs:
+            try:
+                if collection.get(where={"document_id": row["id"]}, limit=1, include=[])["ids"]:
+                    continue  # already indexed
+                bucket, _, path = row["storage_path"].partition("/")
+                data = db.storage.from_(bucket).download(path)
+
+                def set_status(status, error, _table=table, _id=row["id"]):
+                    db.table(_table).update({"processing_status": status, "error_message": error}).eq("id", _id).execute()
+
+                log.info("Re-indexing %s (%s)", row["file_name"], row["id"])
+                index_upload(
+                    data, row["file_name"], row["file_type"],
+                    user_id=owner, document_id=row["id"], community_id=community_id, status=set_status,
+                )
+            except Exception:
+                log.exception("Re-index failed for %s", row.get("id"))
+    except Exception:
+        log.exception("Startup re-index failed")

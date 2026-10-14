@@ -43,6 +43,15 @@ async def database_error(_request, exc: APIError):
     return JSONResponse(status_code=502, content={"detail": f"Database error: {exc.message or exc.code}"})
 
 
+@app.on_event("startup")
+def rebuild_search_index():
+    """The index lives on local disk and is lost on redeploy: rebuild it in the background."""
+    import threading
+    from ingestion_bridge import reindex_missing
+
+    threading.Thread(target=reindex_missing, daemon=True, name="reindex").start()
+
+
 # Register API Routers
 app.include_router(communities.router)
 app.include_router(chats.router)
