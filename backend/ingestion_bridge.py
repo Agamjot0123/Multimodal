@@ -21,6 +21,7 @@ if str(_ROOT) not in sys.path:
 log = logging.getLogger("ingestion_bridge")
 
 StatusCallback = Callable[[str, Optional[str]], None]  # (status, error_message)
+CancellationCheck = Callable[[], bool]
 
 
 def format_time(seconds) -> Optional[str]:
@@ -29,6 +30,24 @@ def format_time(seconds) -> Optional[str]:
         return None
     seconds = int(float(seconds))
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
+def _upload_is_cancelled(document_id: str, community_id: Optional[str]) -> bool:
+    """Treat a missing or deleting metadata row as a cancellation signal."""
+    from db import get_db
+
+    table = "resources" if community_id else "documents"
+    rows = (
+        get_db()
+        .table(table)
+        .select("processing_status")
+        .eq("id", document_id)
+        .execute()
+        .data
+    )
+    if not rows:
+        return True
+    return rows[0].get("processing_status") in {"deleting", "deleted"}
 
 
 def search_chunks(query: str, user_id: str, community_ids: List[str], top_k: int = 5) -> List[ContextChunk]:
@@ -68,6 +87,7 @@ def index_upload(
     document_id: str,
     community_id: Optional[str] = None,
     status: Optional[StatusCallback] = None,
+    should_cancel: Optional[CancellationCheck] = None,
 ) -> None:
     """Runs the ingestion pipeline on an uploaded file. Meant for a background task.
 
@@ -75,6 +95,11 @@ def index_upload(
     (`file_name`) matches the name shown in the UI and used in citations.
     """
     report = status or (lambda *_: None)
+    should_cancel = should_cancel or (
+        lambda: _upload_is_cancelled(document_id, community_id)
+    )
+    if should_cancel():
+        return
     report("processing", None)
     try:
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,16 +113,46 @@ def index_upload(
 
                 transcript = Path(tmp) / "transcript.json"
                 transcribe_video(str(path), str(transcript))
-                count = index_transcript_json(transcript, **kwargs)
+                count = index_transcript_json(
+                    transcript,
+                    should_cancel=should_cancel,
+                    **kwargs,
+                )
             else:  # pdf / image
                 from ingestion.scripts.index_documents import index_file
 
-                count = index_file(path, **kwargs)
+                count = index_file(path, should_cancel=should_cancel, **kwargs)
 
+        if should_cancel():
+            return
         if count == 0:
             report("failed", "No readable text was found in this file.")
         else:
             report("completed", None)
     except Exception as e:
+        from ingestion.scripts.index_documents import IndexCancelled
+
+        if isinstance(e, IndexCancelled):
+            return
         log.exception("Ingestion failed for %s", name)
         report("failed", str(e)[:500])
+
+def delete_indexed_document(
+    document_id: str,
+    *,
+    user_id: str,
+    community_id: str | None = None,
+) -> int:
+    """Delete one document's chunks from the ingestion index."""
+
+    try:
+        from ingestion.scripts.index_documents import delete_indexed_document as delete_from_index
+
+        return delete_from_index(
+            document_id,
+            user_id=user_id,
+            community_id=community_id,
+        )
+    except Exception:
+        log.exception("Failed to delete indexed document %s", document_id)
+        raise

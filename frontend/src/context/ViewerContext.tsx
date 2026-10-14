@@ -41,6 +41,12 @@ export function ViewerProvider({ children }: { children: React.ReactNode }) {
   );
   const [target, setTarget] = useState<ViewerTarget | null>(null);
 
+  useEffect(() => {
+    if (target?.source.resource_id && !sources.some((s) => s.resource_id === target.source.resource_id)) {
+      setTarget(null);
+    }
+  }, [sources, target]);
+
   const openCitation = useCallback(
     (c: Citation) => {
       const source = resolveSource(c, sources);

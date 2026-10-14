@@ -11,7 +11,7 @@ from schemas import (
 from auth import get_current_user, AuthenticatedUser
 from utils import generate_invite_code
 from db import get_db
-from ingestion_bridge import index_upload
+from ingestion_bridge import delete_indexed_document, index_upload
 
 router = APIRouter(prefix="/api/communities", tags=["Communities"])
 
@@ -155,7 +155,8 @@ def list_community_resources(
     return (
         get_db().table("resources")
         .select("id,file_name,file_type,community_id")
-        .eq("community_id", id).order("created_at").execute().data
+        .eq("community_id", id).neq("processing_status", "deleted")
+        .order("created_at").execute().data
     )
 
 
@@ -231,11 +232,22 @@ async def upload_community_resource(
         "file_type": file_type,
         "storage_path": f"{BUCKET}/{path}",
         "uploaded_by": current_user.id,
+        "processing_status": "uploaded",
     }).execute().data[0]
+
+    def set_status(status: str, error: str | None):
+        db.table("resources").update({
+            "processing_status": status,
+            "error_message": error,
+        }).eq("id", row["id"]).execute()
+
     # Index in the background so chat can answer from this file once it finishes.
     background_tasks.add_task(
         index_upload, data, name, file_type,
-        user_id=current_user.id, document_id=row["id"], community_id=id,
+        user_id=current_user.id,
+        document_id=row["id"],
+        community_id=id,
+        status=set_status,
     )
     return CommunityResource(**row)
 
@@ -263,3 +275,55 @@ def get_resource_url(
     bucket, _, path = rows[0]["storage_path"].partition("/")
     signed = get_db().storage.from_(bucket).create_signed_url(path, 3600)
     return {"url": signed["signedURL"]}
+
+
+@router.delete("/{id}/resources/{resource_id}")
+def delete_community_resource(
+    id: str,
+    resource_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Deletes a community resource and all of its indexed chunks."""
+    if not _is_member(id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    db = get_db()
+    try:
+        rows = (
+            db.table("resources")
+            .select("id,storage_path")
+            .eq("id", resource_id)
+            .eq("community_id", id)
+            .neq("processing_status", "deleted")
+            .execute()
+            .data
+        )
+    except APIError as e:
+        if e.code != INVALID_UUID:
+            raise
+        rows = []
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="Resource not found.")
+
+    resource = rows[0]
+    db.table("resources").update({
+        "processing_status": "deleting",
+        "error_message": None,
+    }).eq("id", resource["id"]).execute()
+
+    delete_indexed_document(
+        resource["id"],
+        user_id=current_user.id,
+        community_id=id,
+    )
+
+    bucket, _, storage_path = resource["storage_path"].partition("/")
+    if bucket and storage_path:
+        db.storage.from_(bucket).remove([storage_path])
+
+    db.table("resources").update({
+        "processing_status": "deleted",
+    }).eq("id", resource["id"]).execute()
+
+    return {"status": "success", "document_id": resource["id"]}
