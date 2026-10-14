@@ -21,15 +21,16 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS configuration for local development and Vercel deployments
+# CORS: localhost for development, plus FRONTEND_ORIGINS (comma-separated) for production.
+# Auth uses Bearer tokens, not cookies, so credentials are not needed.
+ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"] + [
+    o.strip().rstrip("/") for o in os.getenv("FRONTEND_ORIGINS", "").split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.vercel.app",
-    ],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=os.getenv("FRONTEND_ORIGIN_REGEX") or None,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

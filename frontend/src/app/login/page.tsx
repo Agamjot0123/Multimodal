@@ -2,10 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Instrument_Serif } from "next/font/google";
 import { AUTH_URL } from "@/lib/auth";
-
-const serif = Instrument_Serif({ weight: "400", subsets: ["latin"] });
 
 function GoogleMark() {
   return (
@@ -35,7 +32,7 @@ function SampleAnswer() {
       <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-indigo-500 px-3.5 py-2 text-sm text-white">
         Why do gradients vanish in deep networks?
       </div>
-      <div className="mt-4 text-[0.95rem] leading-relaxed text-slate-200">
+      <div className="font-reading mt-4 text-[1.05rem] leading-relaxed text-slate-200">
         Backpropagation multiplies one derivative per layer, so small values shrink exponentially with depth
         <Source kind="video" label="Lecture 7 · 12:34" />. Sigmoid is the worst case because its slope never
         exceeds 0.25 <Source kind="slides" label="Slide 14" />. ReLU keeps the slope at 1 for positive inputs,
@@ -57,7 +54,7 @@ function SignIn() {
         <span className="text-lg font-semibold tracking-tight">StudyMate</span>
       </div>
 
-      <h1 className={`${serif.className} mt-10 text-5xl leading-[1.05] tracking-tight text-slate-50 sm:text-6xl`}>
+      <h1 className={"mt-10 text-5xl font-bold leading-[1.02] tracking-tighter text-slate-50 sm:text-6xl"}>
         Answers that show their sources.
       </h1>
       <p className="mt-5 max-w-xs text-base leading-relaxed text-slate-400">

@@ -1,5 +1,5 @@
 import os
-import httpx
+import jwt
 from fastapi import HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
@@ -16,27 +16,28 @@ class AuthenticatedUser(BaseModel):
 
 def get_current_user(request: Request) -> AuthenticatedUser:
     """
-    Authenticates the caller against the Express/Google auth server.
+    Authenticates the caller from `Authorization: Bearer <JWT>`.
 
-    The browser's session cookie is forwarded to `{AUTH_SERVER_URL}/auth/me`, which
-    returns the Google profile for a valid session. A Bearer token equal to the
-    admin test id is also accepted for Swagger UI testing.
+    The JWT is issued by the auth server after Google sign-in and verified
+    here locally with the shared JWT_SECRET (no network call). A Bearer token
+    equal to the admin test id is also accepted for Swagger UI testing.
     """
-    bearer = request.headers.get("authorization", "")
-    if bearer.lower().startswith("bearer ") and bearer[7:].strip() == ADMIN_TEST_ID:
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    token = header[7:].strip()
+
+    if token == ADMIN_TEST_ID:
         return AuthenticatedUser(id=ADMIN_TEST_ID)
 
-    cookie = request.headers.get("cookie")
-    if not cookie:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-
-    auth_url = os.getenv("AUTH_SERVER_URL", "http://localhost:4000").rstrip("/")
+    secret = os.getenv("JWT_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="Server auth is not configured.")
     try:
-        res = httpx.get(f"{auth_url}/auth/me", headers={"cookie": cookie}, timeout=5)
-    except httpx.HTTPError:
-        raise HTTPException(status_code=503, detail="Auth server unreachable.")
-    if res.status_code != 200:
+        claims = jwt.decode(token, secret, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Sign in again.")
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Not authenticated.")
 
-    profile = res.json()
-    return AuthenticatedUser(id=str(profile["id"]), email=profile.get("email"))
+    return AuthenticatedUser(id=str(claims["id"]), email=claims.get("email"))

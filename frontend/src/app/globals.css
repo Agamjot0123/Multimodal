@@ -1,7 +1,35 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-reading: var(--font-newsreader), Georgia, "Times New Roman", serif;
+}
+
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   background: #020617;
   color: #f1f5f9;
+}
+
+/* Highlighter sweep: the one animated moment on the home page. */
+@keyframes sweep {
+  from { background-size: 0% 100%; }
+  to { background-size: 100% 100%; }
+}
+.mark {
+  background-image: linear-gradient(rgba(252, 211, 77, 0.28), rgba(252, 211, 77, 0.28));
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  animation: sweep 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0s);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.mark[aria-pressed="true"] {
+  background-image: linear-gradient(rgba(252, 211, 77, 0.55), rgba(252, 211, 77, 0.55));
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark { animation: none; }
 }

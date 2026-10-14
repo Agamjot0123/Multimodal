@@ -1,6 +1,7 @@
 import type { BackendChunk, ChatStreamEvent, Citation, Community, CommunityResource, QuizQuestion } from "@/types/contract";
 import { MOCK_CHUNKS } from "@/data/mockCourse";
 import { parseTimestamp } from "@/lib/time";
+import { authHeaders } from "@/lib/auth";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 /** Empty base URL → built-in mock routes that mimic the backend wire format. */
@@ -19,7 +20,7 @@ export async function* streamChat(
 ): AsyncGenerator<ChatStreamEvent> {
   const res = await fetch(CHAT_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...authHeaders() },
     body: JSON.stringify({ query: question, retrieved_contexts: contexts }),
     signal,
   });
@@ -62,7 +63,7 @@ export async function* streamChat(
 export async function fetchQuiz(contexts: BackendChunk[], numQuestions: number, signal?: AbortSignal): Promise<QuizQuestion[]> {
   const res = await fetch(QUIZ_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ retrieved_contexts: contexts, num_questions: numQuestions }),
     signal,
   });
@@ -100,13 +101,12 @@ export function retrieveLocal(query: string, k = 4, skill?: string): BackendChun
 /* ---------- Communities ---------- */
 
 export const COMMUNITIES_ENABLED = Boolean(BASE);
-/** Auth is the Express/Google session cookie, sent with `credentials: "include"`. */
+/** Auth is the JWT from the auth server, sent as a Bearer token. */
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
