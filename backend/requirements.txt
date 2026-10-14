@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.5
 aiohttp-retry==2.9.1
@@ -36,7 +37,7 @@ httpcore2==2.13.1
 httptools==0.9.0
 httpx==0.28.1
 httpx2==2.13.1
-huggingface_hub==2.2.0
+huggingface_hub==1.33.0
 hyperframe==6.1.0
 idna==3.20
 importlib_resources==7.1.0
@@ -113,3 +114,4 @@ tiktoken==0.14.0
 sentence-transformers==6.1.0
 rank-bm25==0.2.2
 faster-whisper==1.2.1
+torch==2.14.1
