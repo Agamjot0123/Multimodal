@@ -10,14 +10,14 @@ from supabase import create_client
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     raise RuntimeError(
-        "Set SUPABASE_URL and SUPABASE_SECRET_KEY in the project-root .env"
+        "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the project-root .env"
     )
 
-supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 
 def upload_document(

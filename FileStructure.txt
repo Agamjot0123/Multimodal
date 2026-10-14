@@ -2,7 +2,7 @@ multimodal-ai-tutor/
 ├── backend/                             # FastAPI Application (Member 2 & Member 1)
 │   ├── app/
 │   │   ├── main.py                      # FastAPI initialization, CORS, and endpoint routes
-│   │   ├── auth.py                      # Google session check via Express auth server & Admin ID bypass
+│   │   ├── auth.py                      # Verifies the Google-login JWT (shared JWT_SECRET) & Admin ID bypass
 │   │   ├── schemas.py                   # Pydantic models for request & response contracts
 │   │   ├── utils.py                     # Utility functions (COMM-XXXX invite code generator)
 │   │   ├── vector_store.py              # ChromaDB setup and permission-scoped search logic
@@ -24,7 +24,7 @@ multimodal-ai-tutor/
 │   │   ├── app/                         # Next.js App Router
 │   │   │   ├── (auth)/
 │   │   │   │   ├── login/page.tsx       # Google OAuth login (Express auth server)
-│   │   │   │   └── signup/page.tsx      # Signup page
+│   │   │   │   └── callback/page.tsx    # Receives the JWT after login and stores it
 │   │   │   ├── dashboard/
 │   │   │   │   ├── page.tsx             # Main 3-pane study workspace
 │   │   │   │   └── community/[id]/page.tsx # Shared community workspace & resource feed
@@ -42,9 +42,7 @@ multimodal-ai-tutor/
 │   │   │   └── analytics/
 │   │   │       └── MasteryRadarChart.tsx # Recharts BKT topic mastery visualization
 │   │   ├── lib/
-│   │   │   ├── supabase/
-│   │   │   │   ├── client.ts            # Client-side Supabase browser client (`@supabase/ssr`)
-│   │   │   │   └── server.ts            # Server-side Supabase client for Server Components
+│   │   │   ├── auth.ts                  # JWT storage + Authorization header helpers (no Supabase Auth)
 │   │   │   ├── api.ts                   # Fetch wrappers for FastAPI endpoints
 │   │   │   └── bkt.ts                   # Client-side Bayesian Knowledge Tracing math helpers
 │   │   └── types/

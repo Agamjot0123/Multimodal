@@ -2,6 +2,8 @@ import os
 import json
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from postgrest.exceptions import APIError
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -34,6 +36,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(APIError)
+async def database_error(_request, exc: APIError):
+    """Surface database failures as JSON (an unhandled crash would hide behind a CORS error in the browser)."""
+    return JSONResponse(status_code=502, content={"detail": f"Database error: {exc.message or exc.code}"})
+
 
 # Register API Routers
 app.include_router(communities.router)

@@ -1,4 +1,5 @@
 import os
+from fastapi import HTTPException
 from functools import lru_cache
 from supabase import create_client, Client
 
@@ -14,7 +15,9 @@ def get_db() -> Client:
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
-        raise RuntimeError(
-            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in the environment."
+        # HTTPException (not RuntimeError) so the client gets a readable JSON error with CORS headers.
+        raise HTTPException(
+            status_code=503,
+            detail="Database is not configured: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the backend.",
         )
     return create_client(url, key)

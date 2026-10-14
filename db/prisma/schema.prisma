@@ -24,6 +24,7 @@ model Community {
   members   CommunityMember[]
   resources Resource[]
   chats     Chat[]
+  documents Document[]
 
   @@map("communities")
 }
@@ -67,4 +68,24 @@ model Chat {
 
   @@index([userId])
   @@map("chats")
+}
+
+model Document {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId          String     @map("owner_id")
+  fileName         String     @map("file_name")
+  fileType         String     @map("file_type")
+  accessScope      String     @map("access_scope") // "private" | "community"
+  communityId      String?    @map("community_id") @db.Uuid
+  storagePath      String     @map("storage_path")
+  processingStatus String     @map("processing_status") // uploaded | processing | completed | failed
+  errorMessage     String?    @map("error_message")
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  community Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([communityId])
+  @@map("documents")
 }
