@@ -1,73 +1,135 @@
-multimodal-ai-tutor/
-├── backend/                             # FastAPI Application (Member 2 & Member 1)
-│   ├── app/
-│   │   ├── main.py                      # FastAPI initialization, CORS, and endpoint routes
-│   │   ├── auth.py                      # Verifies the Google-login JWT (shared JWT_SECRET) & Admin ID bypass
-│   │   ├── schemas.py                   # Pydantic models for request & response contracts
-│   │   ├── utils.py                     # Utility functions (COMM-XXXX invite code generator)
-│   │   ├── vector_store.py              # ChromaDB setup and permission-scoped search logic
-│   │   ├── guardrails.py                # Citation parsing and validation logic
-│   │   ├── llm.py                       # LLM client integrations (Groq/Gemini, streaming & quiz generation)
-│   │   └── routers/
-│   │       ├── communities.py           # Community creation, invite code verification, and join routes
-│   │       ├── chats.py                 # Chat history and session management routes
-│   │       └── resources.py             # Shared community/personal PDF and video resource metadata routes
-│   ├── chroma_db/                       # Local ChromaDB persistent storage directory
-│   ├── static/                          # Local media fallback server directory
-│   ├── Dockerfile                       # Container deployment definition (Render / HF Spaces)
-│   ├── requirements.txt                 # Backend dependencies (FastAPI, PyJWT, ChromaDB, etc.)
-│   ├── .env.example                     # Backend environment variable template
-│   └── .gitignore                       # Git ignore rules for backend
-│
-├── frontend/                            # Next.js Application (Member 3)
+Multimodal/
+├── .gitignore
+├── FileStructure.txt
+├── README.md
+├── auth-server/
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── package-lock.json
+│   ├── package.json
+│   └── server.js
+├── backend/
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── API_DOCS.md
+│   ├── auth.py
+│   ├── db.py
+│   ├── guardrails.py
+│   ├── ingestion_bridge.py
+│   ├── llm.py
+│   ├── main.py
+│   ├── render.yaml
+│   ├── requirements.txt
+│   ├── routers/
+│   │   ├── chats.py
+│   │   ├── communities.py
+│   │   └── personal.py
+│   ├── schemas.py
+│   ├── utils.py
+│   └── vector_store.py
+├── db/
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── package-lock.json
+│   ├── package.json
+│   └── prisma/
+│       ├── migrations/
+│       │   ├── 0001_init/
+│       │   │   └── migration.sql
+│       │   ├── 0002_documents_google_owner/
+│       │   │   └── migration.sql
+│       │   ├── 0003_resource_type_image/
+│       │   │   └── migration.sql
+│       │   └── migration_lock.toml
+│       └── schema.prisma
+├── frontend/
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.mjs
+│   ├── next.config.ts
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public/
+│   │   └── media/
+│   │       └── .gitkeep
 │   ├── src/
-│   │   ├── app/                         # Next.js App Router
-│   │   │   ├── (auth)/
-│   │   │   │   ├── login/page.tsx       # Google OAuth login (Express auth server)
-│   │   │   │   └── callback/page.tsx    # Receives the JWT after login and stores it
-│   │   │   ├── dashboard/
-│   │   │   │   ├── page.tsx             # Main 3-pane study workspace
-│   │   │   │   └── community/[id]/page.tsx # Shared community workspace & resource feed
-│   │   │   ├── layout.tsx               # Root layout
-│   │   │   └── page.tsx                 # Landing / Redirect route
+│   │   ├── app/
+│   │   │   ├── auth/
+│   │   │   │   └── callback/
+│   │   │   │       └── page.tsx
+│   │   │   ├── favicon.ico
+│   │   │   ├── globals.css
+│   │   │   ├── layout.tsx
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
 │   │   ├── components/
-│   │   │   ├── sidebar/
-│   │   │   │   ├── Sidebar.tsx          # Navigation sidebar (Chats list, Communities list, Workspace switcher)
-│   │   │   │   ├── DeleteChatModal.tsx  # Chat deletion confirmation
-│   │   │   │   └── InviteCodeModal.tsx  # Join community via code / copy invite key modal
-│   │   │   ├── workspace/
-│   │   │   │   ├── VideoPlayer.tsx      # Video.js player with deep-link timestamp seeking (`?t=142s`)
-│   │   │   │   ├── PdfViewer.tsx        # react-pdf canvas viewer with slide coordinate highlights
-│   │   │   │   └── ChatPanel.tsx        # SSE streaming chat interface with citation links
-│   │   │   └── analytics/
-│   │   │       └── MasteryRadarChart.tsx # Recharts BKT topic mastery visualization
+│   │   │   ├── auth/
+│   │   │   │   └── AuthGate.tsx
+│   │   │   ├── chat/
+│   │   │   │   ├── ChatPanel.tsx
+│   │   │   │   └── CitationChip.tsx
+│   │   │   ├── home/
+│   │   │   │   ├── BlinkingDots.tsx
+│   │   │   │   └── HomeView.tsx
+│   │   │   ├── layout/
+│   │   │   │   └── AppShell.tsx
+│   │   │   ├── mastery/
+│   │   │   │   └── MasteryRadar.tsx
+│   │   │   ├── quiz/
+│   │   │   │   └── QuizPanel.tsx
+│   │   │   ├── sources/
+│   │   │   │   ├── CommunitiesSection.tsx
+│   │   │   │   └── SourcesPanel.tsx
+│   │   │   └── viewer/
+│   │   │       ├── PdfViewer.tsx
+│   │   │       ├── VideoPlayer.tsx
+│   │   │       └── ViewerPanel.tsx
+│   │   ├── context/
+│   │   │   ├── CommunityContext.tsx
+│   │   │   ├── MasteryContext.tsx
+│   │   │   └── ViewerContext.tsx
+│   │   ├── data/
+│   │   │   └── mockCourse.ts
 │   │   ├── lib/
-│   │   │   ├── auth.ts                  # JWT storage + Authorization header helpers (no Supabase Auth)
-│   │   │   ├── api.ts                   # Fetch wrappers for FastAPI endpoints
-│   │   │   └── bkt.ts                   # Client-side Bayesian Knowledge Tracing math helpers
+│   │   │   ├── api.ts
+│   │   │   ├── auth.ts
+│   │   │   ├── bkt.ts
+│   │   │   ├── citations.ts
+│   │   │   └── time.ts
 │   │   └── types/
-│   │       └── index.ts                 # TypeScript interfaces (Chat, Resource, Community, BKT state)
-│   ├── public/                          # Static web assets and branding
-│   ├── package.json                     # Frontend dependencies (Next.js, Video.js, react-pdf, Recharts)
-│   ├── next.config.js                   # Next.js build and header configurations
-│   └── .env.example                     # Frontend environment variable template
-│
-├── ingestion/                           # Data Processing & Storage Pipeline (Member 1)
-│   ├── scripts/
-│   │   ├── pdf_parser.py                # `pdfplumber` / `EasyOCR` slide and textbook text extraction
-│   │   ├── video_transcriber.py         # `faster-whisper` MP4 audio-to-text timestamp generator ($t_{start}, t_{end}$)
-│   │   └── storage_uploader.py          # Supabase Storage uploader SDK routines (`course-materials` bucket)
-│   ├── data/                            # Sample raw media files (Git-ignored)
-│   │   └── .gitkeep
-│   ├── ingest.py                        # CLI batch ingestion runner to populate ChromaDB vector chunks
-│   └── requirements.txt                 # Ingestion dependencies (`faster-whisper`, `pdfplumber`, `supabase`)
-│
-├── docs/                                # Architecture & Submission Deliverables (All Members / Member 3)
-│   ├── system_architecture.png          # End-to-end system sequence diagram
-│   ├── data_flow.png                    # Ingestion to ChromaDB data-flow diagram
-│   └── api_spec.md                      # OpenAPI / REST endpoint specifications
-│
-├── docker-compose.yml                   # Local development orchestrator (Frontend + Backend)
-├── .env.example                         # Root environment variables template
-├── .gitignore                           # Project-wide Git ignore rules
-└── README.md                            # Primary documentation, setup guide & project showcase
+│   │       └── contract.ts
+│   └── tsconfig.json
+├── image.png
+└── ingestion/
+    ├── scripts/
+    │   ├── document_parser.py
+    │   ├── gemini_ocr.py
+    │   ├── image_parser.py
+    │   ├── index_documents.py
+    │   ├── ingestion_pipeline.py
+    │   ├── pdf_parser.py
+    │   ├── process_supabase_file.py
+    │   ├── retrieval.py
+    │   ├── supabase_storage.py
+    │   ├── test_document_metadata.py
+    │   ├── test_hybrid_search.py
+    │   ├── test_index_documents.py
+    │   ├── test_retrieval.py
+    │   ├── test_storage_upload.py
+    │   ├── test_supabase.py
+    │   ├── test_transcript_chunks.py
+    │   ├── text_chunker.py
+    │   └── transcribe_video.py
+    └── tests/
+        ├── test_access_control.py
+        ├── test_document_parser.py
+        ├── test_image_parser.py
+        ├── test_ingestion_pipeline.py
+        ├── test_pdf_extraction.py
+        ├── test_pdf_parser.py
+        ├── test_text_chunker.py
+        ├── test_transcript_chunker.py
+        └── test_transcript_pipeline.py
