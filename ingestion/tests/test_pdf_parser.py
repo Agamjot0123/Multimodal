@@ -1,16 +1,17 @@
 
-import fitz
+import pymupdf
 import pytest
+from unittest.mock import patch
 
 from ingestion.scripts.pdf_parser import extract_pdf
 
 
 def create_test_pdf(path):
-    """Create a tiny PDF for testing without needing a sample file."""
-    document = fitz.open()
+    """Create a temporary PDF for testing."""
+    document = pymupdf.open()
     page = document.new_page()
     page.insert_text((72, 72), "Hello from page one")
-    document.save(path)
+    document.save(str(path))
     document.close()
 
 
@@ -32,3 +33,25 @@ def test_missing_pdf_raises_error(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         extract_pdf(str(missing_path))
+
+
+def test_scanned_pdf_page_uses_ocr(tmp_path):
+    pdf_path = tmp_path / "scanned.pdf"
+
+    # Create an empty page to simulate a scanned page
+    # with no selectable text.
+    document = pymupdf.open()
+    document.new_page()
+    document.save(str(pdf_path))
+    document.close()
+
+    # Mock Tesseract to test the OCR fallback.
+    with patch(
+        "ingestion.scripts.pdf_parser.extract_text_with_gemini",
+        return_value="OCR TEST TEXT",
+    ) as mock_ocr:
+        result = extract_pdf(str(pdf_path))
+
+    mock_ocr.assert_called_once()
+    assert result["pages"][0]["text"] == "OCR TEST TEXT"
+    assert result["pages"][0]["has_text"] is True

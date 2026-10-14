@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
 
-import fitz  # PyMuPDF
+import pymupdf
 
-
+from ingestion.scripts.gemini_ocr import extract_text_with_gemini
 
 
 def extract_pdf(pdf_path: str) -> dict:
-    """Extract text from every PDF page and preserve source metadata."""
+    """Extract native PDF text first, using Gemini for scanned pages."""
     path = Path(pdf_path)
 
     if not path.exists():
@@ -18,9 +18,20 @@ def extract_pdf(pdf_path: str) -> dict:
 
     pages = []
 
-    with fitz.open(path) as document:
+    with pymupdf.open(path) as document:
         for page_index, page in enumerate(document):
+            # Prefer native text extraction when usable text exists.
             text = page.get_text("text").strip()
+
+            # Use Gemini OCR when no selectable text is present.
+            if not text:
+                pixmap = page.get_pixmap(dpi=300, alpha=False)
+                image_bytes = pixmap.tobytes("png")
+
+                text = extract_text_with_gemini(
+                    image_bytes,
+                    mime_type="image/png",
+                )
 
             pages.append({
                 "file_name": path.name,
@@ -38,11 +49,13 @@ def extract_pdf(pdf_path: str) -> dict:
 
 def main():
     pdf_path = Path(
-        "C:\\grishma\\iit mandi\\3rd sem CSE\\multimodal AI track d\\multimodal-day1\\data\\sample-10-page-pdf-a4-size.pdf"
+        "ingestion/data/samples/sample-10-page-pdf-a4-size.pdf"
     )
+
     output_path = Path(
-        "C:\\grishma\\iit mandi\\3rd sem CSE\\multimodal AI track d\\multimodal-day1\\output\\sample-10-page-pdf-a4-size_output.json"
+        "ingestion/data/outputs/sample-10-page-pdf-a4-size_output.json"
     )
+
     result = extract_pdf(str(pdf_path))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -56,7 +69,7 @@ def main():
     print(f"Output saved to: {output_path}")
 
     for page in result["pages"]:
-        status = "Text found" if page["has_text"] else "No selectable text"
+        status = "Text found" if page["has_text"] else "No text found"
         print(f"Page {page['page_number']}: {status}")
 
 
