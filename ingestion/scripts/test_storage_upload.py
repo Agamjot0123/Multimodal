@@ -2,6 +2,8 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client
+from uuid import uuid4
+
 
 load_dotenv()
 
@@ -16,7 +18,7 @@ if not url or not key:
 supabase = create_client(url, key)
 
 bucket = "private-materials"
-storage_path = "integration-tests/supabase-test.txt"
+storage_path = f"integration-tests/supabase-test-{uuid4().hex[:8]}.txt"
 content = b"Supabase private storage upload test."
 
 try:
