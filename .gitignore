@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Generated video transcription outputs
+ingestion/data/transcripts/*.json
+# Large sample video
+ingestion/data/samples/*.mp4
+
+
+ingestion/data/chroma_db/
+ingestion/data/outputs/
