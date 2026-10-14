@@ -25,7 +25,7 @@ app = FastAPI(
 
 # CORS: localhost for development, plus FRONTEND_ORIGINS (comma-separated) for production.
 # Auth uses Bearer tokens, not cookies, so credentials are not needed.
-ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000","https://multimodal-dusky.vercel.app/"] + [
+ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000","https://multimodal-dusky.vercel.app"] + [
     o.strip().rstrip("/") for o in os.getenv("FRONTEND_ORIGINS", "").split(",") if o.strip()
 ]
 app.add_middleware(
