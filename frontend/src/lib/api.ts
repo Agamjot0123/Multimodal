@@ -126,7 +126,6 @@ export const communitiesApi = {
   uploadResource: (id: string, file: File) => upload(`/api/communities/${id}/resources/upload`, file),
   resourceUrl: (id: string, resourceId: string) =>
     call<{ url: string }>("GET", `/api/communities/${id}/resources/${resourceId}/url`).then((r) => r.url),
-  deleteResource: (id: string, resourceId: string) => call<unknown>("DELETE", `/api/communities/${id}/resources/${resourceId}`),
   deleteResource: (id: string, resourceId: string) =>
     call<{ status: string; document_id: string }>("DELETE", `/api/communities/${id}/resources/${resourceId}`),
   create: (name: string, description?: string) =>
