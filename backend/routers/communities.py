@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import mimetypes
+import re
+from uuid import uuid4
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from typing import List
 from postgrest.exceptions import APIError
 from schemas import (
@@ -172,3 +175,81 @@ def add_community_resource(
         "uploaded_by": current_user.id,
     }).execute().data[0]
     return CommunityResource(**row)
+
+
+BUCKET = "community-materials"
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+VIDEO_EXTS = {".mp4", ".webm", ".mov"}
+
+
+async def read_upload(file: UploadFile) -> tuple[str, str, bytes]:
+    """Validates an uploaded PDF/video and returns (safe_name, file_type, bytes)."""
+    name = re.sub(r"[^\w.\- ]", "_", (file.filename or "").split("/")[-1]).strip()
+    ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
+    if ext == ".pdf":
+        file_type = "pdf"
+    elif ext in VIDEO_EXTS:
+        file_type = "video"
+    else:
+        raise HTTPException(status_code=400, detail="Only PDF or video (mp4, webm, mov) files are supported.")
+
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=400, detail="File is empty.")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File is larger than 100 MB.")
+    return name, file_type, data
+
+
+@router.post("/{id}/resources/upload", response_model=CommunityResource)
+async def upload_community_resource(
+    id: str,
+    file: UploadFile = File(...),
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """Uploads a PDF or video to community storage and registers it (members only)."""
+    if not _is_member(id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    name, file_type, data = await read_upload(file)
+
+    path = f"{id}/{uuid4()}/{name}"
+    db = get_db()
+    db.storage.from_(BUCKET).upload(
+        path=path,
+        file=data,
+        file_options={"content-type": mimetypes.guess_type(name)[0] or "application/octet-stream"},
+    )
+    row = db.table("resources").insert({
+        "community_id": id,
+        "file_name": name,
+        "file_type": file_type,
+        "storage_path": f"{BUCKET}/{path}",
+        "uploaded_by": current_user.id,
+    }).execute().data[0]
+    return CommunityResource(**row)
+
+
+@router.get("/{id}/resources/{resource_id}/url")
+def get_resource_url(
+    id: str,
+    resource_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """Returns a short-lived signed URL for viewing a resource (members only)."""
+    if not _is_member(id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    try:
+        rows = (
+            get_db().table("resources").select("storage_path")
+            .eq("id", resource_id).eq("community_id", id).execute().data
+        )
+    except APIError as e:
+        if e.code != INVALID_UUID:
+            raise
+        rows = []
+    if not rows or not rows[0].get("storage_path"):
+        raise HTTPException(status_code=404, detail="Resource has no stored file.")
+    bucket, _, path = rows[0]["storage_path"].partition("/")
+    signed = get_db().storage.from_(bucket).create_signed_url(path, 3600)
+    return {"url": signed["signedURL"]}

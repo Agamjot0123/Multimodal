@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useCommunities } from "@/context/CommunityContext";
 import { useAuth } from "@/components/auth/AuthGate";
 import { COMMUNITIES_ENABLED } from "@/lib/api";
@@ -8,7 +8,7 @@ import { COMMUNITIES_ENABLED } from "@/lib/api";
 type Form = null | "create" | "join";
 
 export function CommunitiesSection() {
-  const { communities, active, resources, setActive, create, join, leave, regenerateCode } = useCommunities();
+  const { communities, active, resources, setActive, create, join, leave, regenerateCode, uploadResource } = useCommunities();
   const { user } = useAuth();
   const [form, setForm] = useState<Form>(null);
   const [name, setName] = useState("");
@@ -17,6 +17,7 @@ export function CommunitiesSection() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!COMMUNITIES_ENABLED) {
     return (
@@ -126,11 +127,34 @@ export function CommunitiesSection() {
               Leave
             </button>
           </div>
+        </div>
+      )}
 
-          <div>
-            <p className="mb-1 text-slate-500">Shared resources</p>
+      <div className="mt-3 text-xs">
+        <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-slate-500">{active ? "Shared resources" : "My files"}</p>
+              <button
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+                className="rounded bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              >
+                {busy ? "Uploading…" : "+ Add file"}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                hidden
+                accept=".pdf,.mp4,.webm,.mov,application/pdf,video/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) run(() => uploadResource(f));
+                }}
+              />
+            </div>
             {resources.length === 0 ? (
-              <p className="text-slate-600">Nothing shared yet.</p>
+              <p className="text-slate-600">{active ? "Nothing shared yet." : "No files yet."}</p>
             ) : (
               <ul className="space-y-1">
                 {resources.map((r) => (
@@ -141,9 +165,8 @@ export function CommunitiesSection() {
                 ))}
               </ul>
             )}
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

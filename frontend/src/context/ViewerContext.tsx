@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Citation, CourseSource, HighlightRect } from "@/types/contract";
-import { MOCK_HIGHLIGHTS } from "@/data/mockCourse";
+import { useCommunities } from "@/context/CommunityContext";
+import { communitiesApi, personalApi } from "@/lib/api";
 
 /** What the viewer pane should currently show. `nonce` forces re-seek on repeat clicks. */
 export interface ViewerTarget {
@@ -18,18 +19,26 @@ interface ViewerState {
   sources: CourseSource[];
   target: ViewerTarget | null;
   openCitation: (c: Citation) => boolean; // false if unresolvable
-  openSource: (s: CourseSource) => void;
+  openSource: (s: CourseSource) => Promise<void>;
 }
 
 const Ctx = createContext<ViewerState | null>(null);
 
-export function ViewerProvider({
-  sources,
-  children,
-}: {
-  sources: CourseSource[];
-  children: React.ReactNode;
-}) {
+/** Community resources get a signed `url` lazily, when opened. */
+export function ViewerProvider({ children }: { children: React.ReactNode }) {
+  const { resources } = useCommunities();
+  const sources = useMemo<CourseSource[]>(
+    () =>
+      resources.map((r) => ({
+        file_name: r.file_name,
+        kind: r.file_type === "video" ? "video" : "pdf",
+        title: r.file_name,
+        url: "",
+        resource_id: r.id,
+        community_id: r.community_id,
+      })),
+    [resources],
+  );
   const [target, setTarget] = useState<ViewerTarget | null>(null);
 
   const openCitation = useCallback(
@@ -41,7 +50,7 @@ export function ViewerProvider({
         page_number: c.page_number,
         start_time: c.start_time,
         end_time: c.end_time,
-        highlights: c.highlights ?? MOCK_HIGHLIGHTS[`${source.file_name}#${c.page_number}`] ?? [],
+        highlights: c.highlights ?? [],
         nonce: Date.now(),
       });
       return true;
@@ -49,8 +58,19 @@ export function ViewerProvider({
     [sources],
   );
 
-  const openSource = useCallback((source: CourseSource) => {
-    setTarget({ source, page_number: null, start_time: null, end_time: null, highlights: [], nonce: Date.now() });
+  const openSource = useCallback(async (source: CourseSource) => {
+    let resolved = source;
+    if (!source.url && source.resource_id) {
+      try {
+        const url = source.community_id
+          ? await communitiesApi.resourceUrl(source.community_id, source.resource_id)
+          : await personalApi.url(source.resource_id);
+        resolved = { ...source, url };
+      } catch {
+        return;
+      }
+    }
+    setTarget({ source: resolved, page_number: null, start_time: null, end_time: null, highlights: [], nonce: Date.now() });
   }, []);
 
   const value = useMemo(

@@ -106,3 +106,4 @@ websocket-client==1.9.2
 websockets==15.0.1
 yarl==1.25.1
 PyJWT==2.15.1
+python-multipart==0.0.20

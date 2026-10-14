@@ -13,7 +13,7 @@ from auth import get_current_user, AuthenticatedUser
 from vector_store import search_permission_scoped_chunks
 from llm import generate_llm_response, stream_llm_response, generate_quiz_json
 from guardrails import validate_and_sanitize_citations
-from routers import communities, chats
+from routers import communities, chats, personal
 
 load_dotenv()
 
@@ -46,6 +46,7 @@ async def database_error(_request, exc: APIError):
 # Register API Routers
 app.include_router(communities.router)
 app.include_router(chats.router)
+app.include_router(personal.router)
 
 
 class AuthenticatedChatRequest(BaseModel):

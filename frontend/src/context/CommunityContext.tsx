@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { communitiesApi } from "@/lib/api";
+import { communitiesApi, personalApi } from "@/lib/api";
 import type { Community, CommunityResource } from "@/types/contract";
 
 const KEY = "studymate.communities";
@@ -16,6 +16,7 @@ interface CommunityState {
   join: (code: string) => Promise<void>;
   leave: (id: string) => Promise<void>;
   regenerateCode: (id: string) => Promise<void>;
+  uploadResource: (file: File) => Promise<void>;
 }
 
 const Ctx = createContext<CommunityState | null>(null);
@@ -48,9 +49,9 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const active = communities.find((c) => c.id === activeId) ?? null;
 
   useEffect(() => {
-    if (!active) return setResources([]);
     let stale = false;
-    communitiesApi.resources(active.id).then((r) => !stale && setResources(r)).catch(() => !stale && setResources([]));
+    // No active community means the personal space: the user's own private files.
+    (active ? communitiesApi.resources(active.id) : personalApi.resources()).then((r) => !stale && setResources(r)).catch(() => !stale && setResources([]));
     return () => {
       stale = true;
     };
@@ -82,6 +83,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         await communitiesApi.leave(id);
         persist(communities.filter((c) => c.id !== id));
         if (activeId === id) setActive(null);
+      },
+      uploadResource: async (file) => {
+        const r = active ? await communitiesApi.uploadResource(active.id, file) : await personalApi.upload(file);
+        setResources((prev) => [...prev, r]);
       },
       regenerateCode: async (id) => {
         const { new_invite_code } = await communitiesApi.regenerate(id);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { retrieveLocal, streamChat } from "@/lib/api";
+import { streamChat } from "@/lib/api";
 import { segmentAnswer } from "@/lib/citations";
 import { CitationChip } from "@/components/chat/CitationChip";
 import type { Citation } from "@/types/contract";
@@ -13,8 +13,6 @@ interface Message {
   citations: Citation[];
   error?: string;
 }
-
-const SUGGESTIONS = ["Explain backpropagation simply", "Why do we need the chain rule?", "Quiz me on gradients"];
 
 export function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -44,7 +42,7 @@ export function ChatPanel() {
 
     abortRef.current = new AbortController();
     try {
-      for await (const evt of streamChat(question, retrieveLocal(question), abortRef.current.signal)) {
+      for await (const evt of streamChat(question, abortRef.current.signal)) {
         if (evt.type === "token") patch((msg) => ({ ...msg, text: msg.text + evt.text }));
         else if (evt.type === "citation") patch((msg) => ({ ...msg, citations: [...msg.citations, evt.citation] }));
         else if (evt.type === "error") patch((msg) => ({ ...msg, error: evt.message }));
@@ -61,15 +59,8 @@ export function ChatPanel() {
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="mx-auto mt-16 max-w-sm text-center">
-            <p className="text-lg font-semibold">Ask about this lecture</p>
+            <p className="text-lg font-semibold">Ask about your course materials</p>
             <p className="mt-1 text-sm text-slate-400">Every answer cites the exact slide, page or timestamp.</p>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => ask(s)} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 

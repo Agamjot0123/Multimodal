@@ -29,6 +29,9 @@ export interface CourseSource {
   url: string; // served by backend / public folder
   duration?: number; // seconds, video only
   pages?: number; // pdf/slides only
+  /** Set for community resources; `url` is a signed link fetched on open. */
+  resource_id?: string;
+  community_id?: string;
 }
 
 /** A citation as resolved by the backend validator. */

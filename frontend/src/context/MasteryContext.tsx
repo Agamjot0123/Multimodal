@@ -2,11 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { bktUpdate } from "@/lib/bkt";
-import { MOCK_SKILLS } from "@/data/mockCourse";
 
 type Mastery = Record<string, number>;
 const KEY = "studymate.mastery.v1";
-const initial = (): Mastery => Object.fromEntries(MOCK_SKILLS.map((s) => [s.skill, s.mastery]));
+const initial = (): Mastery => ({});
 
 interface MasteryState {
   mastery: Mastery;

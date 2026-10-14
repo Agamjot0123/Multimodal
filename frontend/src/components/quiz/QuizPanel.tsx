@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { fetchQuiz, retrieveLocal } from "@/lib/api";
+import { fetchQuiz } from "@/lib/api";
 import { levelOf, quizSizeFor } from "@/lib/bkt";
 import { useMastery } from "@/context/MasteryContext";
 import type { QuizQuestion } from "@/types/contract";
@@ -13,6 +13,7 @@ export function QuizPanel() {
   const { mastery, record } = useMastery();
   const [phase, setPhase] = useState<Phase>("pick");
   const [skill, setSkill] = useState("");
+  const [topic, setTopic] = useState("");
   const [qs, setQs] = useState<QuizQuestion[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -27,7 +28,7 @@ export function QuizPanel() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     try {
-      const questions = await fetchQuiz(retrieveLocal(s, 3, s), quizSizeFor(mastery[s]), abortRef.current.signal);
+      const questions = await fetchQuiz([], quizSizeFor(mastery[s] ?? 0.3), abortRef.current.signal);
       if (!questions.length) throw new Error("No questions returned");
       setQs(questions);
       setI(0);
@@ -60,9 +61,26 @@ export function QuizPanel() {
   if (phase === "pick" || phase === "loading")
     return (
       <div className="flex-1 overflow-y-auto p-4">
-        <p className="text-lg font-semibold">Practice a skill</p>
+        <p className="text-lg font-semibold">Practice a topic</p>
         <p className="mt-1 text-sm text-slate-400">Questions are generated from your course materials; length adapts to your mastery.</p>
         {error && <p className="mt-3 text-xs text-rose-400">⚠ {error}</p>}
+        <form
+          className="mt-4 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (topic.trim() && phase === "pick") start(topic.trim());
+          }}
+        >
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Topic to practice…"
+            className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm outline-none ring-1 ring-slate-800 placeholder:text-slate-500 focus:ring-indigo-500"
+          />
+          <button disabled={phase === "loading" || !topic.trim()} className="rounded-lg bg-indigo-600 px-4 text-sm font-medium disabled:opacity-40">
+            {phase === "loading" ? "Generating…" : "Start"}
+          </button>
+        </form>
         <ul className="mt-4 space-y-2">
           {Object.entries(mastery).map(([s, m]) => (
             <li key={s}>

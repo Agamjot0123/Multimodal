@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BlinkingDots } from "@/components/home/BlinkingDots";
 import { useAuth } from "@/components/auth/AuthGate";
 import { MOCK_CHUNKS } from "@/data/mockCourse";
 import { useCommunities } from "@/context/CommunityContext";
@@ -115,7 +116,9 @@ export function HomeView({ onStart }: { onStart: (mode: Start) => void }) {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="relative min-h-0 flex-1">
+      <BlinkingDots />
+      <div className="absolute inset-0 overflow-y-auto">
       <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 lg:pt-20">
         <section className="grid items-center gap-14 lg:grid-cols-[1fr_1.05fr]">
           <div>
@@ -224,6 +227,7 @@ export function HomeView({ onStart }: { onStart: (mode: Start) => void }) {
             </section>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

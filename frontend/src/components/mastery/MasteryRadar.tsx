@@ -10,6 +10,8 @@ export function MasteryRadar() {
   const data = Object.entries(mastery).map(([skill, v]) => ({ skill, value: Math.round(v * 100) }));
   const avg = data.reduce((a, d) => a + d.value, 0) / (data.length || 1) / 100;
 
+  if (data.length === 0) return null;
+
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">

@@ -44,7 +44,6 @@ export function AppShell() {
         <div className="flex items-center gap-2">
           <span className="grid size-7 place-items-center rounded-md bg-indigo-500 text-sm font-bold">S</span>
           <span className="font-semibold tracking-tight">StudyMate</span>
-          <span className="hidden text-xs text-slate-500 sm:inline">CS101 · Backpropagation</span>
         </div>
         <nav aria-label="View" className="flex gap-1 rounded-full border border-slate-800 bg-slate-900/70 p-0.5 text-xs">
           {(["home", "workspace"] as View[]).map((v) => (
@@ -59,7 +58,7 @@ export function AppShell() {
           ))}
         </nav>
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span>{user?.name ?? "Demo student"}</span>
+          <span>{user?.name}</span>
           {user && (
             <button onClick={signOut} className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white">
               Sign out

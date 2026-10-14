@@ -1,12 +1,10 @@
 import type { BackendChunk, ChatStreamEvent, Citation, Community, CommunityResource, QuizQuestion } from "@/types/contract";
-import { MOCK_CHUNKS } from "@/data/mockCourse";
 import { parseTimestamp } from "@/lib/time";
 import { authHeaders } from "@/lib/auth";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-/** Empty base URL → built-in mock routes that mimic the backend wire format. */
-export const CHAT_URL = BASE ? `${BASE}/api/chat/stream` : "/api/mock-chat";
-export const QUIZ_URL = BASE ? `${BASE}/api/quiz` : "/api/mock-quiz";
+export const CHAT_URL = `${BASE}/api/chat/stream`;
+export const QUIZ_URL = `${BASE}/api/quiz`;
 
 /**
  * Backend SSE frames: `data: {"token": "..."}\n\n` … `data: [DONE]\n\n`.
@@ -15,13 +13,12 @@ export const QUIZ_URL = BASE ? `${BASE}/api/quiz` : "/api/mock-quiz";
  */
 export async function* streamChat(
   question: string,
-  contexts: BackendChunk[],
   signal?: AbortSignal,
 ): AsyncGenerator<ChatStreamEvent> {
   const res = await fetch(CHAT_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...authHeaders() },
-    body: JSON.stringify({ query: question, retrieved_contexts: contexts }),
+    body: JSON.stringify({ query: question }), // backend retrieves permission-scoped context itself
     signal,
   });
   if (!res.ok || !res.body) {
@@ -87,17 +84,6 @@ export function chunkToCitation(c: BackendChunk): Citation {
   };
 }
 
-/** Until Member 1's vector DB is wired in, retrieval is a keyword match over the local chunk set. */
-export function retrieveLocal(query: string, k = 4, skill?: string): BackendChunk[] {
-  const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
-  const pool = skill ? MOCK_CHUNKS.filter((c) => c.skill === skill) : MOCK_CHUNKS;
-  return [...pool]
-    .map((c) => ({ c, score: words.filter((w) => c.chunk.text.toLowerCase().includes(w)).length }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k)
-    .map(({ c }) => c.chunk);
-}
-
 /* ---------- Communities ---------- */
 
 export const COMMUNITIES_ENABLED = Boolean(BASE);
@@ -116,7 +102,28 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return res.json();
 }
 
+async function upload(path: string, file: File): Promise<CommunityResource> {
+  const form = new FormData();
+  form.append("file", file);
+  // No Content-Type header: the browser sets the multipart boundary.
+  const res = await fetch(`${BASE}${path}`, { method: "POST", headers: authHeaders(), body: form });
+  if (!res.ok) {
+    const detail = await res.json().then((j) => j.detail).catch(() => null);
+    throw new Error(typeof detail === "string" ? detail : `Upload failed (HTTP ${res.status})`);
+  }
+  return res.json();
+}
+
+export const personalApi = {
+  resources: () => call<CommunityResource[]>("GET", "/api/personal/resources"),
+  upload: (file: File) => upload("/api/personal/resources/upload", file),
+  url: (resourceId: string) => call<{ url: string }>("GET", `/api/personal/resources/${resourceId}/url`).then((r) => r.url),
+};
+
 export const communitiesApi = {
+  uploadResource: (id: string, file: File) => upload(`/api/communities/${id}/resources/upload`, file),
+  resourceUrl: (id: string, resourceId: string) =>
+    call<{ url: string }>("GET", `/api/communities/${id}/resources/${resourceId}/url`).then((r) => r.url),
   create: (name: string, description?: string) =>
     call<Community>("POST", "/api/communities/create", { name, description: description || null }),
   join: (invite_code: string) => call<Community>("POST", "/api/communities/join", { invite_code }),
