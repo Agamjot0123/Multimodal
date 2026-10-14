@@ -32,7 +32,8 @@ class ChatResponse(BaseModel):
 
 # --- Day 9: Adaptive Quiz Schemas ---
 class QuizRequest(BaseModel):
-    retrieved_contexts: List[ContextChunk] = Field(..., description="Context chunks to base quiz on")
+    topic: Optional[str] = Field(default=None, description="Topic to quiz on; used to retrieve the user's material when no contexts are given")
+    retrieved_contexts: List[ContextChunk] = Field(default=[], description="Context chunks to base quiz on")
     num_questions: int = Field(default=3, description="Number of quiz questions to generate")
 
 class QuizQuestion(BaseModel):

@@ -127,11 +127,24 @@ def quiz_endpoint(
     """
     Generates a structured multiple-choice quiz based on course material.
     """
+    contexts = request.retrieved_contexts
+    if not contexts:
+        # Quiz on the user's own materials (private files + joined communities) about the topic.
+        topic = (request.topic or "").strip()
+        if not topic:
+            raise HTTPException(status_code=400, detail="Choose a topic to be quizzed on.")
+        contexts = search_permission_scoped_chunks(query=topic, user=current_user, top_k=8)
+        if not contexts:
+            raise HTTPException(
+                status_code=404,
+                detail=f'No material found for "{topic}". Upload a file about it (and wait for it to finish processing) or try another topic.',
+            )
     try:
         quiz_data = generate_quiz_json(
-            contexts=request.retrieved_contexts,
+            contexts=contexts,
             num_questions=request.num_questions,
-            provider=provider
+            provider=provider,
+            topic=request.topic,
         )
         return quiz_data
     except Exception as e:

@@ -79,11 +79,12 @@ CRITICAL CITATION RULES:
             yield chunk.text
 
 
-def generate_quiz_json(contexts: List[ContextChunk], num_questions: int = 3, provider: str = "groq") -> dict:
+def generate_quiz_json(contexts: List[ContextChunk], num_questions: int = 3, provider: str = "groq", topic: str | None = None) -> dict:
     """Generates structured multiple-choice quiz questions based on retrieved course chunks."""
     context_str = format_context_for_prompt(contexts)
     
-    prompt = f"""You are an expert tutor. Generate exactly {num_questions} multiple-choice quiz questions based ONLY on the context below.
+    focus = f' The questions must test understanding of "{topic}" itself (concepts, definitions, how and why), never the context or its formatting.' if topic else ""
+    prompt = f"""You are an expert tutor. Generate exactly {num_questions} multiple-choice quiz questions based ONLY on the context below.{focus}
 
 --- COURSE CONTEXT ---
 {context_str}

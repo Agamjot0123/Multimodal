@@ -28,7 +28,7 @@ export function QuizPanel() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     try {
-      const questions = await fetchQuiz([], quizSizeFor(mastery[s] ?? 0.3), abortRef.current.signal);
+      const questions = await fetchQuiz(s, quizSizeFor(mastery[s] ?? 0.3), abortRef.current.signal);
       if (!questions.length) throw new Error("No questions returned");
       setQs(questions);
       setI(0);

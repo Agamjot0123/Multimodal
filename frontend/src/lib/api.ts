@@ -57,14 +57,17 @@ export async function* streamChat(
   }
 }
 
-export async function fetchQuiz(contexts: BackendChunk[], numQuestions: number, signal?: AbortSignal): Promise<QuizQuestion[]> {
+export async function fetchQuiz(topic: string, numQuestions: number, signal?: AbortSignal, contexts: BackendChunk[] = []): Promise<QuizQuestion[]> {
   const res = await fetch(QUIZ_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ retrieved_contexts: contexts, num_questions: numQuestions }),
+    body: JSON.stringify({ topic, retrieved_contexts: contexts, num_questions: numQuestions }),
     signal,
   });
-  if (!res.ok) throw new Error(`Quiz request failed (HTTP ${res.status})`);
+  if (!res.ok) {
+    const detail = await res.json().then((j) => j.detail).catch(() => null);
+    throw new Error(typeof detail === "string" ? detail : `Quiz request failed (HTTP ${res.status})`);
+  }
   const data = await res.json();
   return data.questions as QuizQuestion[];
 }
