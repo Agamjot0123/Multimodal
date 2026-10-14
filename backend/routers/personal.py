@@ -7,7 +7,7 @@ from schemas import CommunityResource
 from auth import get_current_user, AuthenticatedUser
 from db import get_db
 from routers.communities import read_upload
-from ingestion_bridge import index_upload, delete_indexed
+from ingestion_bridge import delete_indexed_document, index_upload
 
 router = APIRouter(prefix="/api/personal", tags=["Personal"])
 
@@ -25,6 +25,7 @@ def list_personal_resources(current_user: AuthenticatedUser = Depends(get_curren
     rows = (
         get_db().table("documents").select("id,file_name,file_type")
         .eq("owner_id", current_user.id).eq("access_scope", "private")
+        .neq("processing_status", "deleted")
         .order("created_at").execute().data
     )
     return [_to_resource(r) for r in rows]
@@ -86,25 +87,55 @@ def get_personal_resource_url(resource_id: str, current_user: AuthenticatedUser 
     bucket, _, path = rows[0]["storage_path"].partition("/")
     return {"url": get_db().storage.from_(bucket).create_signed_url(path, 3600)["signedURL"]}
 
-
 @router.delete("/resources/{resource_id}")
-def delete_personal_resource(resource_id: str, current_user: AuthenticatedUser = Depends(get_current_user)):
-    """Deletes one of the caller's own files: storage object, database row and search index."""
+def delete_personal_resource(
+    resource_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Deletes one of the caller's own files and all of its indexed chunks."""
     db = get_db()
+
     try:
         rows = (
-            db.table("documents").select("storage_path")
-            .eq("id", resource_id).eq("owner_id", current_user.id).eq("access_scope", "private")
-            .execute().data
+            db.table("documents")
+            .select("id,storage_path")
+            .eq("id", resource_id)
+            .eq("owner_id", current_user.id)
+            .eq("access_scope", "private")
+            .neq("processing_status", "deleted")
+            .execute()
+            .data
         )
     except APIError as e:
         if e.code != INVALID_UUID:
             raise
         rows = []
+
     if not rows:
         raise HTTPException(status_code=404, detail="File not found.")
-    bucket, _, path = rows[0]["storage_path"].partition("/")
-    db.storage.from_(bucket).remove([path])
-    db.table("documents").delete().eq("id", resource_id).execute()
-    delete_indexed(resource_id)
-    return {"status": "success"}
+
+    document = rows[0]
+
+    bucket, _, storage_path = document["storage_path"].partition("/")
+
+    db.table("documents").update({
+        "processing_status": "deleting",
+        "error_message": None,
+    }).eq("id", document["id"]).execute()
+
+    delete_indexed_document(
+        document["id"],
+        user_id=current_user.id,
+    )
+
+    if bucket and storage_path:
+        db.storage.from_(bucket).remove([storage_path])
+
+    db.table("documents").update({
+        "processing_status": "deleted",
+    }).eq("id", document["id"]).execute()
+
+    return {
+        "status": "success",
+        "document_id": document["id"],
+    }

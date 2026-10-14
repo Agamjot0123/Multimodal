@@ -1,10 +1,17 @@
 
 import json
 from pathlib import Path
+from typing import Callable
 
 from ingestion.scripts.document_parser import extract_document
 from ingestion.scripts.text_chunker import chunk_document, chunk_transcript
-from ingestion.scripts.retrieval import add_chunks
+from ingestion.scripts.retrieval import (
+    add_chunks,
+    delete_document_chunks,
+)
+
+class IndexCancelled(Exception):
+    """Raised when an upload is deleted while it is being indexed."""
 
 
 def _attach_metadata(
@@ -33,6 +40,7 @@ def index_file(
     document_id: str,
     community_id: str | None = None,
     source_path: str | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> int:
     """Extract, chunk, and index a PDF or image."""
 
@@ -55,6 +63,9 @@ def index_file(
         user_id=user_id,
         community_id=community_id,
     )
+
+    if should_cancel and should_cancel():
+        raise IndexCancelled
 
     count = add_chunks(
         chunks,
@@ -80,6 +91,7 @@ def index_transcript_json(
     document_id: str,
     community_id: str | None = None,
     source_path: str | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> int:
     """Chunk and index a timestamped faster-whisper transcript."""
 
@@ -119,6 +131,9 @@ def index_transcript_json(
         community_id=community_id,
     )
 
+    if should_cancel and should_cancel():
+        raise IndexCancelled
+
     count = add_chunks(
         chunks,
         owner_id=user_id,
@@ -134,3 +149,24 @@ def index_transcript_json(
     print(f"Community: {community_id or 'Private'}")
 
     return count
+
+def delete_indexed_document(
+    document_id: str,
+    *,
+    user_id: str,
+    community_id: str | None = None,
+) -> int:
+    """Remove all Chroma chunks for an authorized document."""
+
+    if not document_id.strip():
+        raise ValueError("document_id must not be empty")
+
+    if not user_id.strip():
+        raise ValueError("user_id must not be empty")
+
+    if community_id:
+        # Membership authorization is enforced by the backend route; community
+        # chunks are owned in Chroma by the uploader, not the deleting member.
+        return delete_document_chunks(document_id, community_id=community_id)
+
+    return delete_document_chunks(document_id, owner_id=user_id)

@@ -118,7 +118,8 @@ export const personalApi = {
   resources: () => call<CommunityResource[]>("GET", "/api/personal/resources"),
   upload: (file: File) => upload("/api/personal/resources/upload", file),
   url: (resourceId: string) => call<{ url: string }>("GET", `/api/personal/resources/${resourceId}/url`).then((r) => r.url),
-  remove: (resourceId: string) => call<unknown>("DELETE", `/api/personal/resources/${resourceId}`),
+  remove: (resourceId: string) =>
+    call<{ status: string; document_id: string }>("DELETE", `/api/personal/resources/${resourceId}`),
 };
 
 export const communitiesApi = {
@@ -126,6 +127,8 @@ export const communitiesApi = {
   resourceUrl: (id: string, resourceId: string) =>
     call<{ url: string }>("GET", `/api/communities/${id}/resources/${resourceId}/url`).then((r) => r.url),
   deleteResource: (id: string, resourceId: string) => call<unknown>("DELETE", `/api/communities/${id}/resources/${resourceId}`),
+  deleteResource: (id: string, resourceId: string) =>
+    call<{ status: string; document_id: string }>("DELETE", `/api/communities/${id}/resources/${resourceId}`),
   create: (name: string, description?: string) =>
     call<Community>("POST", "/api/communities/create", { name, description: description || null }),
   join: (invite_code: string) => call<Community>("POST", "/api/communities/join", { invite_code }),

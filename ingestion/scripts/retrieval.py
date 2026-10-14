@@ -260,3 +260,39 @@ def get_relevant_chunks(
         })
 
     return results
+
+def delete_document_chunks(
+    document_id: str,
+    *,
+    owner_id: str | None = None,
+    community_id: str | None = None,
+) -> int:
+    """Delete all indexed chunks belonging to one document."""
+
+    if not document_id.strip():
+        raise ValueError("document_id must not be empty")
+
+    where = {"document_id": document_id}
+
+    if owner_id is not None:
+        if not owner_id.strip():
+            raise ValueError("owner_id must not be empty")
+        where["owner_id"] = owner_id
+
+    if community_id is not None:
+        where["community_id"] = community_id
+
+    filters = [{key: value} for key, value in where.items()]
+    match = filters[0] if len(filters) == 1 else {"$and": filters}
+
+    existing = collection.get(
+        where=match,
+        include=[],
+    )
+
+    ids = existing.get("ids") or []
+    if not ids:
+        return 0
+
+    collection.delete(ids=ids)
+    return len(ids)

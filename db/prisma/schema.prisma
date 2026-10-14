@@ -50,6 +50,8 @@ model Resource {
   fileType    ResourceType @map("file_type")
   storagePath String?      @map("storage_path")
   uploadedBy  String?      @map("uploaded_by")
+  processingStatus String   @default("uploaded") @map("processing_status")
+  errorMessage String?     @map("error_message")
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
@@ -79,7 +81,7 @@ model Document {
   accessScope      String     @map("access_scope") // "private" | "community"
   communityId      String?    @map("community_id") @db.Uuid
   storagePath      String     @map("storage_path")
-  processingStatus String     @map("processing_status") // uploaded | processing | completed | failed
+  processingStatus String     @map("processing_status") // uploaded | processing | completed | failed | deleting | deleted
   errorMessage     String?    @map("error_message")
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)

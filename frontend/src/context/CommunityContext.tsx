@@ -98,7 +98,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         persist(communities.map((c) => (c.id === id ? { ...c, invite_code: new_invite_code } : c)));
       },
     }),
-    [communities, active, resources, activeId], // eslint-disable-line react-hooks/exhaustive-deps
+    [communities, active, resources, activeId],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
