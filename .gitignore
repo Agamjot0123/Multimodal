@@ -10,16 +10,16 @@ env/
 
 # Testing
 .pytest_cache/
-# Environment/secrets
+
+# Secrets
 .env
 .env.*
 !.env.example
 
-# Generated video transcription outputs
-ingestion/data/transcripts/*.json
-# Large sample video
-ingestion/data/samples/*.mp4
-
-
+# Generated ingestion data
 ingestion/data/chroma_db/
 ingestion/data/outputs/
+ingestion/data/transcripts/
+ingestion/data/samples/
+
+# Keep directories available in Git with placeholder files if needed
