@@ -14,6 +14,10 @@ const {
   FRONTEND_URL = "http://localhost:3000",
 } = process.env;
 
+// Comma-separated, with stray spaces / trailing slashes tolerated: a browser Origin never has a trailing slash,
+// so "https://app.vercel.app/" would silently fail the CORS match.
+const FRONTEND_ORIGINS = FRONTEND_URL.split(",").map((u) => u.trim().replace(/\/+$/, "")).filter(Boolean);
+
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !JWT_SECRET) {
   console.error("Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / JWT_SECRET (see .env.example)");
   process.exit(1);
@@ -41,17 +45,17 @@ const signToken = (u) => jwt.sign(u, JWT_SECRET, { algorithm: "HS256", expiresIn
 
 const app = express();
 app.set("trust proxy", 1);
-app.use(cors({ origin: FRONTEND_URL.split(","), allowedHeaders: ["Authorization", "Content-Type"] }));
+app.use(cors({ origin: FRONTEND_ORIGINS, allowedHeaders: ["Authorization", "Content-Type"] }));
 app.use(passport.initialize());
 
 app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
 
 app.get(
   "/auth/google/callback",
-  passport.authenticate("google", { session: false, failureRedirect: `${FRONTEND_URL.split(",")[0]}/login?error=1` }),
+  passport.authenticate("google", { session: false, failureRedirect: `${FRONTEND_ORIGINS[0]}/login?error=1` }),
   (req, res) => {
     // The token travels in the URL fragment so it never reaches server logs or Referer headers.
-    res.redirect(`${FRONTEND_URL.split(",")[0]}/auth/callback#token=${encodeURIComponent(signToken(req.user))}`);
+    res.redirect(`${FRONTEND_ORIGINS[0]}/auth/callback#token=${encodeURIComponent(signToken(req.user))}`);
   },
 );
 
