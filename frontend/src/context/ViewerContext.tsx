@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import type { Citation, CourseSource } from "@/types/contract";
+import type { Citation, CourseSource, HighlightRect } from "@/types/contract";
+import { MOCK_HIGHLIGHTS } from "@/data/mockCourse";
 
 /** What the viewer pane should currently show. `nonce` forces re-seek on repeat clicks. */
 export interface ViewerTarget {
@@ -9,6 +10,7 @@ export interface ViewerTarget {
   page_number: number | null;
   start_time: number | null;
   end_time: number | null;
+  highlights: HighlightRect[];
   nonce: number;
 }
 
@@ -39,6 +41,7 @@ export function ViewerProvider({
         page_number: c.page_number,
         start_time: c.start_time,
         end_time: c.end_time,
+        highlights: c.highlights ?? MOCK_HIGHLIGHTS[`${source.file_name}#${c.page_number}`] ?? [],
         nonce: Date.now(),
       });
       return true;
@@ -47,7 +50,7 @@ export function ViewerProvider({
   );
 
   const openSource = useCallback((source: CourseSource) => {
-    setTarget({ source, page_number: null, start_time: null, end_time: null, nonce: Date.now() });
+    setTarget({ source, page_number: null, start_time: null, end_time: null, highlights: [], nonce: Date.now() });
   }, []);
 
   const value = useMemo(

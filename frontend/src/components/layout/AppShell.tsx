@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { SourcesPanel } from "@/components/sources/SourcesPanel";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { QuizPanel } from "@/components/quiz/QuizPanel";
 import { ViewerPanel } from "@/components/viewer/ViewerPanel";
+import { useAuth } from "@/components/auth/AuthGate";
 import { useViewer } from "@/context/ViewerContext";
 
 type Pane = "sources" | "chat" | "viewer";
@@ -15,7 +17,9 @@ type Pane = "sources" | "chat" | "viewer";
  */
 export function AppShell() {
   const [pane, setPane] = useState<Pane>("chat");
+  const [mode, setMode] = useState<"chat" | "quiz">("chat");
   const { target } = useViewer();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     if (target) setPane("viewer");
@@ -31,7 +35,14 @@ export function AppShell() {
           <span className="font-semibold tracking-tight">StudyMate</span>
           <span className="hidden text-xs text-slate-500 sm:inline">CS101 · Backpropagation</span>
         </div>
-        <span className="text-xs text-slate-500">Demo student</span>
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span>{user?.name ?? "Demo student"}</span>
+          {user && (
+            <button onClick={signOut} className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+              Sign out
+            </button>
+          )}
+        </div>
       </header>
 
       <main className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1.15fr)]">
@@ -39,7 +50,18 @@ export function AppShell() {
           <SourcesPanel />
         </section>
         <section className={`${show("chat")} min-h-0 flex-col border-slate-800 lg:flex lg:border-r`}>
-          <ChatPanel />
+          <div className="flex h-10 shrink-0 gap-1 border-b border-slate-800 px-3 pt-1.5 text-sm">
+            {(["chat", "quiz"] as const).map((m) => (
+              <button key={m} onClick={() => setMode(m)} className={`rounded-t-md px-3 capitalize ${mode === m ? "bg-slate-800 text-white" : "text-slate-400"}`}>
+                {m}
+              </button>
+            ))}
+          </div>
+          {/* Keep ChatPanel mounted so history and in-flight streams survive tab switches. */}
+          <div className={`${mode === "chat" ? "flex" : "hidden"} min-h-0 flex-1 flex-col`}>
+            <ChatPanel />
+          </div>
+          {mode === "quiz" && <QuizPanel />}
         </section>
         <section className={`${show("viewer")} min-h-0 flex-col lg:flex`}>
           <ViewerPanel />

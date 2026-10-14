@@ -11,7 +11,7 @@ export function CitationChip({ label, citation }: { label: string; citation: Cit
   if (!citation) {
     return (
       <span title="Could not resolve this source" className="mx-0.5 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-500 line-through">
-        {label}
+        {label.replace(/^Source:\s*/i, "")}
       </span>
     );
   }
@@ -23,7 +23,7 @@ export function CitationChip({ label, citation }: { label: string; citation: Cit
       className="mx-0.5 inline-flex items-center gap-1 rounded-md bg-indigo-500/15 px-1.5 py-0.5 align-baseline text-xs font-medium text-indigo-300 ring-1 ring-indigo-500/30 transition hover:bg-indigo-500/30"
     >
       <span aria-hidden>{isVideo ? "▶" : "❐"}</span>
-      {label}
+      {label.replace(/^Source:\s*/i, "")}
     </button>
   );
 }

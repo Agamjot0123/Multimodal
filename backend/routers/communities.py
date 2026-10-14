@@ -1,19 +1,46 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from typing import List
+from postgrest.exceptions import APIError
 from schemas import (
     CreateCommunityRequest, CommunityResponse, JoinCommunityRequest,
-    CommunityResource, ChatSession
+    CommunityResource, CreateResourceRequest
 )
 from auth import get_current_user, AuthenticatedUser
 from utils import generate_invite_code
+from db import get_db
 
 router = APIRouter(prefix="/api/communities", tags=["Communities"])
 
-# In-memory mock databases (Replace with your database client like Supabase PostgREST)
-mock_communities_db = {}
-mock_memberships_db = {}  # community_id -> set of user_ids
-mock_resources_db = {}    # community_id -> list of resources
-mock_chats_db = {}        # user_id -> list of chat sessions
+UNIQUE_VIOLATION = "23505"
+INVALID_UUID = "22P02"
+
+
+def _get_community(id: str) -> dict:
+    try:
+        rows = get_db().table("communities").select("*").eq("id", id).execute().data
+    except APIError as e:
+        if e.code == INVALID_UUID:
+            rows = []
+        else:
+            raise
+    if not rows:
+        raise HTTPException(status_code=404, detail="Community not found.")
+    return rows[0]
+
+
+def _is_member(community_id: str, user_id: str) -> bool:
+    try:
+        rows = (
+            get_db().table("community_members").select("user_id")
+            .eq("community_id", community_id).eq("user_id", user_id)
+            .execute().data
+        )
+    except APIError as e:
+        if e.code == INVALID_UUID:
+            return False
+        raise
+    return bool(rows)
+
 
 @router.post("/create", response_model=CommunityResponse)
 def create_community(
@@ -21,22 +48,28 @@ def create_community(
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """Creates a new community and generates a unique invite code."""
-    community_id = f"comm_{len(mock_communities_db) + 1}"
-    invite_code = generate_invite_code()
+    db = get_db()
+    for _ in range(5):  # retry on the (unlikely) invite code collision
+        try:
+            community = db.table("communities").insert({
+                "name": req.name,
+                "description": req.description,
+                "owner_id": current_user.id,
+                "invite_code": generate_invite_code(),
+            }).execute().data[0]
+            break
+        except APIError as e:
+            if e.code != UNIQUE_VIOLATION:
+                raise
+    else:
+        raise HTTPException(status_code=500, detail="Could not generate a unique invite code.")
 
-    community_data = {
-        "id": community_id,
-        "name": req.name,
-        "description": req.description,
-        "owner_id": current_user.id,
-        "invite_code": invite_code,
-    }
+    db.table("community_members").insert({
+        "community_id": community["id"],
+        "user_id": current_user.id,
+    }).execute()
 
-    mock_communities_db[community_id] = community_data
-    mock_memberships_db[community_id] = {current_user.id}
-    mock_resources_db[community_id] = []
-
-    return CommunityResponse(**community_data)
+    return CommunityResponse(**community)
 
 
 @router.post("/join", response_model=CommunityResponse)
@@ -44,20 +77,19 @@ def join_community(
     req: JoinCommunityRequest,
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
-    """Joins a community using an 8-character invite code."""
-    target_community = None
-    for comm in mock_communities_db.values():
-        if comm["invite_code"] == req.invite_code:
-            target_community = comm
-            break
-
-    if not target_community:
+    """Joins a community using an invite code."""
+    db = get_db()
+    rows = db.table("communities").select("*").eq("invite_code", req.invite_code).execute().data
+    if not rows:
         raise HTTPException(status_code=404, detail="Invalid invite code.")
 
-    comm_id = target_community["id"]
-    mock_memberships_db[comm_id].add(current_user.id)
+    community = rows[0]
+    db.table("community_members").upsert(
+        {"community_id": community["id"], "user_id": current_user.id},
+        on_conflict="community_id,user_id",
+    ).execute()
 
-    return CommunityResponse(**target_community)
+    return CommunityResponse(**community)
 
 
 @router.get("/{id}/invite-code")
@@ -66,12 +98,11 @@ def get_invite_code(
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """Fetches the invite code for a community (members only)."""
-    if id not in mock_communities_db:
-        raise HTTPException(status_code=404, detail="Community not found.")
-    if current_user.id not in mock_memberships_db.get(id, set()):
+    community = _get_community(id)
+    if not _is_member(id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied. You are not a member.")
 
-    return {"invite_code": mock_communities_db[id]["invite_code"]}
+    return {"invite_code": community["invite_code"]}
 
 
 @router.post("/{id}/regenerate-key")
@@ -80,16 +111,19 @@ def regenerate_invite_code(
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """Regenerates the invite code (owner only)."""
-    if id not in mock_communities_db:
-        raise HTTPException(status_code=404, detail="Community not found.")
-    
-    community = mock_communities_db[id]
+    community = _get_community(id)
     if community["owner_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Only the community owner can regenerate invite keys.")
 
-    new_code = generate_invite_code()
-    community["invite_code"] = new_code
-    return {"id": id, "new_invite_code": new_code}
+    for _ in range(5):
+        new_code = generate_invite_code()
+        try:
+            get_db().table("communities").update({"invite_code": new_code}).eq("id", id).execute()
+            return {"id": id, "new_invite_code": new_code}
+        except APIError as e:
+            if e.code != UNIQUE_VIOLATION:
+                raise
+    raise HTTPException(status_code=500, detail="Could not generate a unique invite code.")
 
 
 @router.delete("/leave")
@@ -98,10 +132,12 @@ def leave_community(
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """Removes current user from a community."""
-    if community_id in mock_memberships_db and current_user.id in mock_memberships_db[community_id]:
-        mock_memberships_db[community_id].remove(current_user.id)
-        return {"status": "success", "message": f"Left community {community_id}"}
-    raise HTTPException(status_code=400, detail="You are not a member of this community.")
+    if not _is_member(community_id, current_user.id):
+        raise HTTPException(status_code=400, detail="You are not a member of this community.")
+
+    get_db().table("community_members").delete() \
+        .eq("community_id", community_id).eq("user_id", current_user.id).execute()
+    return {"status": "success", "message": f"Left community {community_id}"}
 
 
 @router.get("/{id}/resources", response_model=List[CommunityResource])
@@ -110,6 +146,29 @@ def list_community_resources(
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """Lists all shared course resources in a community."""
-    if current_user.id not in mock_memberships_db.get(id, set()):
+    if not _is_member(id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied.")
-    return mock_resources_db.get(id, [])
+    return (
+        get_db().table("resources")
+        .select("id,file_name,file_type,community_id")
+        .eq("community_id", id).order("created_at").execute().data
+    )
+
+
+@router.post("/{id}/resources", response_model=CommunityResource)
+def add_community_resource(
+    id: str,
+    req: CreateResourceRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """Registers document metadata for a file shared in a community (members only)."""
+    if not _is_member(id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    row = get_db().table("resources").insert({
+        "community_id": id,
+        "file_name": req.file_name,
+        "file_type": req.file_type,
+        "storage_path": req.storage_path,
+        "uploaded_by": current_user.id,
+    }).execute().data[0]
+    return CommunityResource(**row)

@@ -1,57 +1,42 @@
 import os
-import jwt
-from fastapi import HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import httpx
+from fastapi import HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 
-security = HTTPBearer()
-
-# Fixed Admin/Testing ID for development and Swagger UI
+# Fixed Admin/Testing ID for development and Swagger UI (sent as a Bearer token)
 ADMIN_TEST_ID = "admin-test-uuid-993967d0-bb82"
+
 
 class AuthenticatedUser(BaseModel):
     id: str
     email: Optional[str] = "testuser@example.com"
     communities: List[str] = []
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> AuthenticatedUser:
+
+def get_current_user(request: Request) -> AuthenticatedUser:
     """
-    Decodes and authenticates Supabase JWT tokens.
-    Allows a designated Admin/Dev ID for instant Swagger testing while
-    strictly requiring valid JWT tokens for standard production traffic.
+    Authenticates the caller against the Express/Google auth server.
+
+    The browser's session cookie is forwarded to `{AUTH_SERVER_URL}/auth/me`, which
+    returns the Google profile for a valid session. A Bearer token equal to the
+    admin test id is also accepted for Swagger UI testing.
     """
-    token = credentials.credentials.strip()
+    bearer = request.headers.get("authorization", "")
+    if bearer.lower().startswith("bearer ") and bearer[7:].strip() == ADMIN_TEST_ID:
+        return AuthenticatedUser(id=ADMIN_TEST_ID)
 
-    if not token:
-        raise HTTPException(status_code=401, detail="Authorization token missing.")
+    cookie = request.headers.get("cookie")
+    if not cookie:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
 
-    # 1. Designated Admin / Developer ID Bypass
-    if token == ADMIN_TEST_ID:
-        return AuthenticatedUser(
-            id=ADMIN_TEST_ID,
-            email="testuser@example.com",
-            communities=[]
-        )
-
-    # 2. Production Supabase JWT Authentication
+    auth_url = os.getenv("AUTH_SERVER_URL", "http://localhost:4000").rstrip("/")
     try:
-        # Decodes user access tokens sent by Supabase Auth (e.g., from Next.js frontend)
-        payload = jwt.decode(token, options={"verify_signature": False})
-        user_id = payload.get("sub")
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: missing 'sub' claim.")
+        res = httpx.get(f"{auth_url}/auth/me", headers={"cookie": cookie}, timeout=5)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=503, detail="Auth server unreachable.")
+    if res.status_code != 200:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
 
-        user_metadata = payload.get("user_metadata", {})
-        communities = user_metadata.get("communities", [])
-
-        return AuthenticatedUser(
-            id=user_id,
-            email=payload.get("email", "testuser@example.com"),
-            communities=communities
-        )
-    except jwt.DecodeError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid authentication token: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+    profile = res.json()
+    return AuthenticatedUser(id=str(profile["id"]), email=profile.get("email"))

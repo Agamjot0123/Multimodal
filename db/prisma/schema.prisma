@@ -1,0 +1,70 @@
+// Schema + migrations only. The FastAPI backend queries these tables through
+// supabase-py; Prisma Client is not used.
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Supabase pooler (port 6543) with ?pgbouncer=true
+  directUrl = env("DIRECT_URL")   // Supabase direct/session connection, used for migrations
+}
+
+// User ids are text (not uuid) so the dev/admin test id keeps working.
+
+enum ResourceType {
+  pdf
+  video
+}
+
+model Community {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  ownerId     String   @map("owner_id")
+  inviteCode  String   @unique @map("invite_code")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  members   CommunityMember[]
+  resources Resource[]
+  chats     Chat[]
+
+  @@map("communities")
+}
+
+model CommunityMember {
+  communityId String   @map("community_id") @db.Uuid
+  userId      String   @map("user_id")
+  joinedAt    DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@id([communityId, userId])
+  @@index([userId])
+  @@map("community_members")
+}
+
+// Document metadata; the files themselves live in Supabase Storage / ChromaDB.
+model Resource {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId String       @map("community_id") @db.Uuid
+  fileName    String       @map("file_name")
+  fileType    ResourceType @map("file_type")
+  storagePath String?      @map("storage_path")
+  uploadedBy  String?      @map("uploaded_by")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
+  @@map("resources")
+}
+
+model Chat {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id")
+  title       String
+  communityId String?   @map("community_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  community Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("chats")
+}

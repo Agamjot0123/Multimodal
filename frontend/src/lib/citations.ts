@@ -5,7 +5,7 @@ export type Segment =
   | { kind: "text"; text: string }
   | { kind: "citation"; label: string; citation: Citation | null };
 
-const BRACKET = /\[([^\[\]]{1,80})\]/g;
+const BRACKET = /\[([^\[\]]{1,120})\]/g;
 
 /**
  * Split an answer into text + citation segments.
@@ -35,7 +35,7 @@ export function segmentAnswer(text: string, known: Citation[]): Segment[] {
 const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 function looksLikeCitation(label: string) {
-  return /\b(slide|pg|page|p\.)\b|\d{1,2}:\d{2}/i.test(label);
+  return /^source:/i.test(label) || /\b(slide|pg|page|p\.)\b|\d{1,2}:\d{2}/i.test(label);
 }
 
 /**
@@ -44,6 +44,7 @@ function looksLikeCitation(label: string) {
  * ViewerContext resolves it against the course source list.
  */
 export function heuristicParse(label: string): Citation | null {
+  label = label.replace(/^Source:\s*/i, ""); // backend tags: "[Source: file.pdf, Pg 4]"
   const parts = label.split(",").map((p) => p.trim());
   let page: number | null = null;
   let start: number | null = null;

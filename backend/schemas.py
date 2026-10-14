@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 # --- Source Attribution Metadata ---
 class SourceMetadata(BaseModel):
@@ -66,6 +66,11 @@ class CommunityResource(BaseModel):
     file_name: str
     file_type: str  # 'pdf' or 'video'
     community_id: str
+
+class CreateResourceRequest(BaseModel):
+    file_name: str
+    file_type: Literal["pdf", "video"]
+    storage_path: Optional[str] = None
 
 class ChatSession(BaseModel):
     id: str

@@ -17,7 +17,7 @@ load_dotenv()
 
 app = FastAPI(
     title="Multimodal AI Tutor API",
-    description="Backend API with Supabase Auth, Community Endpoints, and Permission-Scoped Vector Search.",
+    description="Backend API with Google (Express) Auth, Community Endpoints, and Permission-Scoped Vector Search.",
     version="2.0.0"
 )
 
@@ -49,8 +49,7 @@ def health_check():
         "status": "online",
         "version": "2.0.0",
         "groq_key_configured": bool(os.getenv("GROQ_API_KEY")),
-        "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY")),
-        "supabase_auth_enabled": bool(os.getenv("SUPABASE_JWT_SECRET"))
+        "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY"))
     }
 
 
@@ -61,7 +60,7 @@ def chat_endpoint(
     provider: str = "groq"
 ):
     """
-    1. Validates Supabase JWT authentication.
+    1. Validates the Google session via the auth server.
     2. Runs permission-scoped ChromaDB query for the current user.
     3. Generates LLM response with citation guardrails.
     """

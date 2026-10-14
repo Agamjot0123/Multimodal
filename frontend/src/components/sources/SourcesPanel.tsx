@@ -2,7 +2,8 @@
 
 import { useViewer } from "@/context/ViewerContext";
 import { formatTimestamp } from "@/lib/time";
-import { MasteryMini } from "@/components/mastery/MasteryMini";
+import { CommunitiesSection } from "@/components/sources/CommunitiesSection";
+import { MasteryRadar } from "@/components/mastery/MasteryRadar";
 import type { SourceKind } from "@/types/contract";
 
 const ICON: Record<SourceKind, string> = { video: "▶", slides: "▤", pdf: "❐" };
@@ -11,11 +12,12 @@ export function SourcesPanel() {
   const { sources, target, openSource } = useViewer();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <CommunitiesSection />
       <h2 className="px-4 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
         Course materials
       </h2>
-      <ul className="space-y-1 overflow-y-auto px-2">
+      <ul className="space-y-1 px-2">
         {sources.map((s) => {
           const active = target?.source.file_name === s.file_name;
           return (
@@ -40,7 +42,7 @@ export function SourcesPanel() {
       </ul>
 
       <div className="mt-auto border-t border-slate-800 p-4">
-        <MasteryMini />
+        <MasteryRadar />
       </div>
     </div>
   );

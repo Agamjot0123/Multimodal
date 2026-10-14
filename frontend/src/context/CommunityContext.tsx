@@ -1,0 +1,100 @@
+"use client";
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { communitiesApi } from "@/lib/api";
+import type { Community, CommunityResource } from "@/types/contract";
+
+const KEY = "studymate.communities";
+const ACTIVE_KEY = "studymate.activeCommunity";
+
+interface CommunityState {
+  communities: Community[];
+  active: Community | null;
+  resources: CommunityResource[];
+  setActive: (id: string | null) => void;
+  create: (name: string, description?: string) => Promise<void>;
+  join: (code: string) => Promise<void>;
+  leave: (id: string) => Promise<void>;
+  regenerateCode: (id: string) => Promise<void>;
+}
+
+const Ctx = createContext<CommunityState | null>(null);
+
+const read = <T,>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const write = (key: string, value: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
+
+/** The backend has no "list my communities" endpoint, so memberships are remembered per browser. */
+export function CommunityProvider({ children }: { children: React.ReactNode }) {
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [resources, setResources] = useState<CommunityResource[]>([]);
+
+  useEffect(() => {
+    setCommunities(read<Community[]>(KEY, []));
+    setActiveId(read<string | null>(ACTIVE_KEY, null));
+  }, []);
+
+  const active = communities.find((c) => c.id === activeId) ?? null;
+
+  useEffect(() => {
+    if (!active) return setResources([]);
+    let stale = false;
+    communitiesApi.resources(active.id).then((r) => !stale && setResources(r)).catch(() => !stale && setResources([]));
+    return () => {
+      stale = true;
+    };
+  }, [active?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const persist = (next: Community[]) => {
+    setCommunities(next);
+    write(KEY, next);
+  };
+  const setActive = useCallback((id: string | null) => {
+    setActiveId(id);
+    write(ACTIVE_KEY, id);
+  }, []);
+
+  const add = (c: Community) => {
+    persist([...communities.filter((x) => x.id !== c.id), c]);
+    setActive(c.id);
+  };
+
+  const value = useMemo<CommunityState>(
+    () => ({
+      communities,
+      active,
+      resources,
+      setActive,
+      create: async (name, description) => add(await communitiesApi.create(name, description)),
+      join: async (code) => add(await communitiesApi.join(code.trim())),
+      leave: async (id) => {
+        await communitiesApi.leave(id);
+        persist(communities.filter((c) => c.id !== id));
+        if (activeId === id) setActive(null);
+      },
+      regenerateCode: async (id) => {
+        const { new_invite_code } = await communitiesApi.regenerate(id);
+        persist(communities.map((c) => (c.id === id ? { ...c, invite_code: new_invite_code } : c)));
+      },
+    }),
+    [communities, active, resources, activeId], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useCommunities() {
+  const v = useContext(Ctx);
+  if (!v) throw new Error("useCommunities must be used inside <CommunityProvider>");
+  return v;
+}

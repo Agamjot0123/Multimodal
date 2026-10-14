@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_URL, streamChat } from "@/lib/sse";
+import { retrieveLocal, streamChat } from "@/lib/api";
 import { segmentAnswer } from "@/lib/citations";
 import { CitationChip } from "@/components/chat/CitationChip";
-import { MOCK_COURSE_ID } from "@/data/mockCourse";
 import type { Citation } from "@/types/contract";
 
 interface Message {
@@ -24,7 +23,9 @@ export function ChatPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   async function ask(question: string) {
@@ -43,11 +44,7 @@ export function ChatPanel() {
 
     abortRef.current = new AbortController();
     try {
-      for await (const evt of streamChat(
-        CHAT_URL,
-        { question, course_id: MOCK_COURSE_ID, student_id: "demo" },
-        abortRef.current.signal,
-      )) {
+      for await (const evt of streamChat(question, retrieveLocal(question), abortRef.current.signal)) {
         if (evt.type === "token") patch((msg) => ({ ...msg, text: msg.text + evt.text }));
         else if (evt.type === "citation") patch((msg) => ({ ...msg, citations: [...msg.citations, evt.citation] }));
         else if (evt.type === "error") patch((msg) => ({ ...msg, error: evt.message }));

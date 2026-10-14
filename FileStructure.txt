@@ -2,7 +2,7 @@ multimodal-ai-tutor/
 ├── backend/                             # FastAPI Application (Member 2 & Member 1)
 │   ├── app/
 │   │   ├── main.py                      # FastAPI initialization, CORS, and endpoint routes
-│   │   ├── auth.py                      # Supabase JWT decoding, auth middleware & Admin ID bypass
+│   │   ├── auth.py                      # Google session check via Express auth server & Admin ID bypass
 │   │   ├── schemas.py                   # Pydantic models for request & response contracts
 │   │   ├── utils.py                     # Utility functions (COMM-XXXX invite code generator)
 │   │   ├── vector_store.py              # ChromaDB setup and permission-scoped search logic
@@ -23,12 +23,12 @@ multimodal-ai-tutor/
 │   ├── src/
 │   │   ├── app/                         # Next.js App Router
 │   │   │   ├── (auth)/
-│   │   │   │   ├── login/page.tsx       # Supabase Auth Login (Google OAuth + Email/Password)
+│   │   │   │   ├── login/page.tsx       # Google OAuth login (Express auth server)
 │   │   │   │   └── signup/page.tsx      # Signup page
 │   │   │   ├── dashboard/
 │   │   │   │   ├── page.tsx             # Main 3-pane study workspace
 │   │   │   │   └── community/[id]/page.tsx # Shared community workspace & resource feed
-│   │   │   ├── layout.tsx               # Root layout with Supabase session provider
+│   │   │   ├── layout.tsx               # Root layout
 │   │   │   └── page.tsx                 # Landing / Redirect route
 │   │   ├── components/
 │   │   │   ├── sidebar/

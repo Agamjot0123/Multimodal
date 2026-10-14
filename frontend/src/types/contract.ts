@@ -8,6 +8,15 @@ export interface ChunkMetadata {
   page_number: number | null;
   start_time: number | null; // seconds
   end_time: number | null; // seconds
+  /** Optional normalized (0–1) boxes to highlight on the cited PDF page. */
+  highlights?: HighlightRect[];
+}
+
+export interface HighlightRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export type SourceKind = "video" | "pdf" | "slides";
@@ -42,4 +51,43 @@ export interface ChatRequest {
   student_id: string;
   /** Skill level from BKT, used by backend for prompt steering (Day 7). */
   mastery_level?: "novice" | "developing" | "proficient";
+}
+
+/* ---------- Backend (FastAPI) wire types ---------- */
+
+export interface BackendChunk {
+  chunk_id: string;
+  text: string;
+  metadata: {
+    file_name: string;
+    page_number: number | null;
+    start_time: string | null; // "MM:SS"
+    end_time: string | null;
+  };
+}
+
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correct_option_index: number;
+  explanation: string;
+  source_citation: string;
+}
+
+/* ---------- Communities (backend /api/communities) ---------- */
+
+export interface Community {
+  id: string;
+  name: string;
+  description?: string | null;
+  owner_id: string;
+  invite_code: string;
+}
+
+export interface CommunityResource {
+  id: string;
+  file_name: string;
+  file_type: "pdf" | "video" | string;
+  community_id: string;
 }
