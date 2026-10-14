@@ -8,7 +8,7 @@ import { COMMUNITIES_ENABLED } from "@/lib/api";
 type Form = null | "create" | "join";
 
 export function CommunitiesSection() {
-  const { communities, active, resources, setActive, create, join, leave, regenerateCode, uploadResource } = useCommunities();
+  const { communities, active, resources, setActive, create, join, leave, regenerateCode, uploadResource, deleteResource } = useCommunities();
   const { user } = useAuth();
   const [form, setForm] = useState<Form>(null);
   const [name, setName] = useState("");
@@ -160,7 +160,16 @@ export function CommunitiesSection() {
                 {resources.map((r) => (
                   <li key={r.id} className="flex items-center gap-2 text-slate-300">
                     <span className="text-slate-500">{r.file_type === "video" ? "▶" : r.file_type === "image" ? "▣" : "❐"}</span>
-                    <span className="truncate">{r.file_name}</span>
+                    <span className="min-w-0 flex-1 truncate">{r.file_name}</span>
+                    <button
+                      disabled={busy}
+                      title="Delete file"
+                      aria-label={`Delete ${r.file_name}`}
+                      onClick={() => confirm(`Delete ${r.file_name}?`) && run(() => deleteResource(r.id))}
+                      className="text-slate-500 hover:text-red-400 disabled:opacity-50"
+                    >
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ul>

@@ -17,6 +17,7 @@ interface CommunityState {
   leave: (id: string) => Promise<void>;
   regenerateCode: (id: string) => Promise<void>;
   uploadResource: (file: File) => Promise<void>;
+  deleteResource: (resourceId: string) => Promise<void>;
 }
 
 const Ctx = createContext<CommunityState | null>(null);
@@ -87,6 +88,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       uploadResource: async (file) => {
         const r = active ? await communitiesApi.uploadResource(active.id, file) : await personalApi.upload(file);
         setResources((prev) => [...prev, r]);
+      },
+      deleteResource: async (resourceId) => {
+        await (active ? communitiesApi.deleteResource(active.id, resourceId) : personalApi.remove(resourceId));
+        setResources((prev) => prev.filter((r) => r.id !== resourceId));
       },
       regenerateCode: async (id) => {
         const { new_invite_code } = await communitiesApi.regenerate(id);

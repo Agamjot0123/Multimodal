@@ -138,6 +138,15 @@ def add_chunks(
     return len(documents)
 
 
+def delete_document_chunks(document_id: str) -> None:
+    """Remove every indexed chunk that belongs to one document."""
+
+    if not document_id.strip():
+        raise ValueError("document_id must not be empty")
+
+    collection.delete(where={"document_id": document_id})
+
+
 def get_relevant_chunks(
     query: str,
     *,

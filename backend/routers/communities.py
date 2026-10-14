@@ -11,7 +11,7 @@ from schemas import (
 from auth import get_current_user, AuthenticatedUser
 from utils import generate_invite_code
 from db import get_db
-from ingestion_bridge import index_upload
+from ingestion_bridge import index_upload, delete_indexed
 
 router = APIRouter(prefix="/api/communities", tags=["Communities"])
 
@@ -263,3 +263,35 @@ def get_resource_url(
     bucket, _, path = rows[0]["storage_path"].partition("/")
     signed = get_db().storage.from_(bucket).create_signed_url(path, 3600)
     return {"url": signed["signedURL"]}
+
+
+@router.delete("/{id}/resources/{resource_id}")
+def delete_community_resource(
+    id: str,
+    resource_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """Deletes a shared file (its uploader or the community owner only)."""
+    community = _get_community(id)
+    if not _is_member(id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    db = get_db()
+    try:
+        rows = (
+            db.table("resources").select("storage_path,uploaded_by")
+            .eq("id", resource_id).eq("community_id", id).execute().data
+        )
+    except APIError as e:
+        if e.code != INVALID_UUID:
+            raise
+        rows = []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Resource not found.")
+    if current_user.id not in (rows[0].get("uploaded_by"), community.get("owner_id")):
+        raise HTTPException(status_code=403, detail="Only the uploader or community owner can delete this file.")
+    if rows[0].get("storage_path"):
+        bucket, _, path = rows[0]["storage_path"].partition("/")
+        db.storage.from_(bucket).remove([path])
+    db.table("resources").delete().eq("id", resource_id).execute()
+    delete_indexed(resource_id)
+    return {"status": "success"}
