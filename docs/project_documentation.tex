@@ -1,0 +1,558 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{amsmath}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=blue!60!black,
+  citecolor=blue!60!black,
+  pdftitle={Multimodal AI Study Companion - Track D},
+  pdfauthor={Multimodal AI Hackathon Track D Team}
+}
+
+\definecolor{codebg}{RGB}{245,247,250}
+\definecolor{codecomment}{RGB}{80,100,80}
+\definecolor{codekeyword}{RGB}{0,70,140}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{black!15},
+  breaklines=true,
+  columns=fullflexible,
+  showstringspaces=false,
+  commentstyle=\color{codecomment},
+  keywordstyle=\color{codekeyword}\bfseries
+}
+
+\title{\textbf{Multimodal AI Study Companion}\\
+\large Hackathon Track D Project Documentation}
+\author{Multimodal AI Hackathon Track D Team}
+\date{October 2026}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Executive Summary}
+
+The Multimodal AI Study Companion is an AI-powered learning workspace for
+lecture videos, textbooks, slides, and images. The system converts uploaded
+learning material into searchable, source-aware knowledge. Students can ask
+questions, receive answers grounded in their own course material, open the
+supporting page or video timestamp, and practice with adaptive quizzes.
+
+The current implementation combines a Next.js frontend, a FastAPI backend,
+Supabase PostgreSQL and Storage, a Python ingestion pipeline, ChromaDB hybrid
+retrieval, and Groq/Gemini language model integrations. Authentication is
+performed using a JWT issued by the companion authentication server.
+
+The central design principle is:
+
+\begin{quote}
+\emph{Store course knowledge in retrieval, and use the language model for
+grounded tutoring behavior.}
+\end{quote}
+
+This approach avoids placing private course documents into model weights and
+allows uploaded files to be replaced or deleted.
+
+\section{Project Objectives}
+
+\begin{enumerate}[leftmargin=*]
+  \item Ingest PDFs, scanned PDFs, images, and lecture videos.
+  \item Preserve source metadata such as page numbers and video timestamps.
+  \item Support permission-scoped retrieval for personal and community files.
+  \item Generate grounded answers with verifiable source citations.
+  \item Provide deep links from citations to a PDF page or video timestamp.
+  \item Generate course-material-based quizzes with explanations.
+  \item Track learner mastery using a client-side Bayesian Knowledge Tracing
+        (BKT)-style model.
+  \item Support the complete file lifecycle, including removal of indexed
+        content after a student deletes an uploaded file.
+\end{enumerate}
+
+\section{System Architecture}
+
+\subsection{High-Level Components}
+
+\begin{longtable}{p{0.24\textwidth}p{0.68\textwidth}}
+\toprule
+\textbf{Component} & \textbf{Responsibility} \\
+\midrule
+Next.js frontend & Three-pane study workspace, authentication flow,
+resource list, chat stream, quiz interface, PDF/video/image viewers, and
+mastery visualization. \\
+FastAPI backend & Authentication, authorization, resource APIs, chat and quiz
+endpoints, signed URLs, background ingestion, and integration with retrieval
+and language model services. \\
+Supabase PostgreSQL & Communities, memberships, resources, documents, and chat
+metadata. \\
+Supabase Storage & Private and community file storage using signed URLs. \\
+Python ingestion package & File extraction, OCR, transcription, chunking,
+embedding, indexing, and indexed-document deletion. \\
+ChromaDB & Persistent vector collection containing source-aware document and
+transcript chunks. \\
+BM25 & Keyword retrieval over permission-filtered chunks. \\
+Groq/Gemini & Grounded answer generation and quiz generation. \\
+JWT authentication server & Google sign-in integration and signed identity
+claims used by the FastAPI backend. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Request and Data Flow}
+
+\begin{lstlisting}[language={},caption={Upload and question-answering flow}]
+Upload:
+Browser -> FastAPI upload route
+        -> Supabase Storage and metadata row
+        -> background ingestion task
+        -> extraction/transcription
+        -> token-aware chunking
+        -> embeddings and ChromaDB upsert
+
+Question:
+Browser -> authenticated FastAPI chat route
+        -> database membership lookup
+        -> permission-scoped vector and BM25 retrieval
+        -> reciprocal-rank fusion
+        -> Groq/Gemini prompt with source metadata
+        -> citation validation
+        -> SSE answer stream or JSON response
+\end{lstlisting}
+
+\subsection{Repository Layout}
+
+\begin{lstlisting}[language={},caption={Relevant repository directories}]
+backend/       FastAPI application, routers, authentication, LLM and bridge
+frontend/      Next.js application and study workspace
+ingestion/     Extraction, transcription, chunking and ChromaDB indexing
+db/            Prisma schema and database migrations
+auth-server/   Authentication service
+README.md      Project overview and setup information
+\end{lstlisting}
+
+\section{Multimodal Ingestion Pipeline}
+
+\subsection{PDF Extraction}
+
+The PDF parser uses PyMuPDF. It first attempts native text extraction for each
+page. If a page has no selectable text, the page is rendered to a PNG image at
+high resolution and sent to the Gemini OCR helper. The output preserves:
+
+\begin{itemize}[leftmargin=*]
+  \item original file name;
+  \item one-based page number;
+  \item extracted text;
+  \item a boolean indicating whether text was found.
+\end{itemize}
+
+This two-stage approach supports both normal text PDFs and scanned documents.
+
+\subsection{Image Extraction}
+
+PNG, JPG, and JPEG files are represented as one-page documents. The image bytes
+are passed to Gemini OCR with the corresponding MIME type. The resulting
+document uses the same page-level shape as PDF extraction, which allows both
+formats to share the document chunking and indexing path.
+
+\subsection{Video Transcription}
+
+The video transcriber uses \texttt{faster-whisper}. MP4, MKV, MOV, AVI, and
+WebM files are supported by the ingestion script. Each non-empty transcript
+segment stores:
+
+\begin{lstlisting}[language=Python]
+{
+    "start_time": 12.345,
+    "end_time": 18.920,
+    "text": "The explanation of the concept starts here."
+}
+\end{lstlisting}
+
+The detected language, language probability, model size, and timestamped
+segments are written to a JSON transcript.
+
+\subsection{Chunking}
+
+Document and transcript chunking uses the \texttt{cl100k\_base} tokenizer.
+The default chunk size is 400 tokens with 50 tokens of overlap.
+
+For documents, chunks remain associated with their page number. For
+transcripts, chunks combine consecutive segments and preserve the first
+segment's start time and the last segment's end time. Oversized transcript
+segments are split into smaller token-sized pieces.
+
+\begin{longtable}{p{0.28\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Metadata field} & \textbf{Meaning} \\
+\midrule
+\texttt{file\_name} & Original source file name. \\
+\texttt{page\_number} & PDF or image page location; null for video chunks. \\
+\texttt{start\_time} & Video start time in seconds; null for document chunks. \\
+\texttt{end\_time} & Video end time in seconds; null for document chunks. \\
+\texttt{chunk\_index} & Chunk position within the indexed source. \\
+\texttt{document\_id} & Stable database/resource identifier. \\
+\texttt{owner\_id} & Uploading user's identity. \\
+\texttt{access\_scope} & Either \texttt{private} or \texttt{community}. \\
+\texttt{community\_id} & Community identifier when sharing is enabled. \\
+\bottomrule
+\end{longtable}
+
+\section{ChromaDB Indexing and Retrieval}
+
+\subsection{Embedding and Indexing}
+
+The ingestion package uses the \texttt{all-MiniLM-L6-v2} sentence-transformer
+to embed non-empty chunks. Embeddings are normalized and stored in the
+persistent Chroma collection \texttt{course\_material\_scoped}.
+
+Each Chroma record has a stable identifier derived from the database document
+identifier:
+
+\begin{lstlisting}[language=Python]
+chunk_id = f"{document_id}_{chunk_index}_{page_number}_{start_time}"
+\end{lstlisting}
+
+The \texttt{document\_id} is also stored explicitly in metadata. The metadata
+field is the authoritative key for deleting all chunks belonging to a source.
+
+\subsection{Permission-Scoped Hybrid Retrieval}
+
+The retrieval process is:
+
+\begin{enumerate}[leftmargin=*]
+  \item Build a private-document filter for the authenticated user.
+  \item Query the database for communities the user belongs to.
+  \item Add authorized community documents to the access filter.
+  \item Run Chroma vector retrieval using the combined filter.
+  \item Run BM25 keyword retrieval only over the same filtered records.
+  \item Combine vector and keyword rankings using Reciprocal Rank Fusion.
+  \item Convert the selected records into backend source metadata.
+\end{enumerate}
+
+This prevents unauthorized private or community chunks from entering either
+the semantic or keyword search path.
+
+\subsection{Citation Handling}
+
+The LLM prompt includes a required source tag for every retrieved chunk. The
+citation guardrail scans generated answers, removes unmatched citation tags,
+and returns validated citation objects. PDF citations contain page numbers;
+video citations contain timestamp ranges.
+
+The frontend resolves citations to a source and opens the appropriate viewer.
+Video citations seek the Video.js player, while PDF citations navigate to the
+referenced page. The current implementation supports the viewer's highlight
+metadata contract, although automatic OCR/text bounding-box generation is not
+yet complete.
+
+\section{Storage, Metadata, and Access Control}
+
+\subsection{Supabase Storage}
+
+The application uses separate buckets:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{private-materials} for personal files;
+  \item \texttt{community-materials} for community files.
+\end{itemize}
+
+Storage paths include an identity and a stable resource identifier. The
+backend returns short-lived signed URLs only after checking ownership or
+community membership.
+
+\subsection{Database Model}
+
+The database contains the following principal entities:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Community}: shared learning space and invite code;
+  \item \textbf{CommunityMember}: user membership relation;
+  \item \textbf{Resource}: community resource metadata;
+  \item \textbf{Document}: personal or indexed resource metadata;
+  \item \textbf{Chat}: chat-session metadata.
+\end{itemize}
+
+The current processing states are:
+
+\begin{center}
+\texttt{uploaded} $\rightarrow$ \texttt{processing} $\rightarrow$
+\texttt{completed}
+\end{center}
+
+Failures use \texttt{failed}. Deletion uses \texttt{deleting} followed by
+\texttt{deleted}.
+
+\section{Deletion and Index Consistency}
+
+\subsection{Why Deletion Needs Coordination}
+
+Ingestion runs as a background task. Without coordination, the following race
+could occur:
+
+\begin{enumerate}[leftmargin=*]
+  \item A file starts OCR or transcription.
+  \item The student deletes the file.
+  \item The delete route removes existing Chroma chunks.
+  \item The old background task finishes and inserts the chunks again.
+\end{enumerate}
+
+\subsection{Implemented Deletion Flow}
+
+The current worktree contains the following deletion flow:
+
+\begin{enumerate}[leftmargin=*]
+  \item The backend verifies ownership or community membership.
+  \item The metadata record is marked \texttt{deleting}.
+  \item All Chroma records matching the stable \texttt{document\_id} are
+        removed.
+  \item The Supabase Storage object is removed.
+  \item The metadata record is marked \texttt{deleted}.
+  \item Deleted resources are excluded from normal resource listings.
+\end{enumerate}
+
+The background ingestion bridge checks whether the source record is missing,
+\texttt{deleting}, or \texttt{deleted}. A final cancellation check occurs after
+extraction/chunking and immediately before Chroma insertion.
+
+The API routes are:
+
+\begin{lstlisting}[language={}]
+DELETE /api/personal/resources/{resource_id}
+DELETE /api/communities/{community_id}/resources/{resource_id}
+\end{lstlisting}
+
+This design preserves document isolation and avoids deleting chunks by
+non-unique file names.
+
+\section{Backend Application}
+
+The FastAPI application exposes:
+
+\begin{itemize}[leftmargin=*]
+  \item health check endpoint;
+  \item synchronous grounded chat endpoint;
+  \item server-sent event chat endpoint;
+  \item quiz generation endpoint;
+  \item personal resource upload, listing, signed URL, and deletion;
+  \item community creation, joining, membership, resource upload, signed URL,
+        and deletion;
+  \item chat-session listing and deletion.
+\end{itemize}
+
+The backend authenticates requests using a bearer JWT. The service-role
+Supabase client is kept on the backend, while the frontend receives only
+short-lived signed resource URLs.
+
+\section{Frontend Application}
+
+\subsection{Study Workspace}
+
+The frontend provides a three-pane workflow:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Sources}: personal and community materials;
+  \item \textbf{Chat}: streaming grounded questions and answers;
+  \item \textbf{Viewer}: PDF, video, and image source viewer.
+\end{enumerate}
+
+\subsection{Viewers and Deep Links}
+
+The PDF viewer uses \texttt{react-pdf} and supports page navigation. The
+Video.js player supports programmatic seeking to a citation timestamp. Images
+are displayed directly from signed Storage URLs.
+
+When a selected resource is deleted, the viewer context detects that the
+resource is no longer present and clears the open viewer target.
+
+\subsection{Assessment and Mastery}
+
+The quiz interface supports multiple-choice questions, answer feedback,
+explanations, source-citation text, and mastery updates. The client-side BKT
+helpers classify topic mastery and adapt quiz length.
+
+The current implementation provides the user-interface and local learner
+model foundation. Formal simulated-student results and a backend-persisted
+learner profile remain future evaluation work.
+
+\section{Current Implementation Status}
+
+\begin{longtable}{p{0.34\textwidth}p{0.20\textwidth}p{0.38\textwidth}}
+\toprule
+\textbf{Feature} & \textbf{Status} & \textbf{Notes} \\
+\midrule
+Native PDF extraction & Implemented & PyMuPDF page extraction. \\
+Scanned PDF OCR & Implemented & Gemini OCR fallback. \\
+Image OCR & Implemented & PNG/JPG/JPEG support. \\
+Video transcription & Implemented & Timestamped faster-whisper output. \\
+Token-aware chunking & Implemented & Documents and transcripts. \\
+ChromaDB indexing & Implemented & Persistent embeddings and metadata. \\
+Hybrid retrieval & Implemented & Vector search, BM25, and RRF. \\
+Permission filtering & Implemented & Private owner and authorized communities. \\
+Supabase Storage & Implemented & Uploads and signed URLs. \\
+Personal deletion & Implemented in current worktree & Chroma, Storage, and metadata cleanup. \\
+Community deletion & Implemented in current worktree & Membership-protected cleanup. \\
+Deletion race protection & Implemented in current worktree & Processing state and cancellation checks. \\
+Citation validation & Partially implemented & Non-streaming validation is present. \\
+Streaming citation events & Incomplete & Frontend/backend event behavior needs alignment. \\
+Grounded quiz retrieval & Incomplete & Quiz route needs topic-based server retrieval. \\
+BKT personalization & Prototype & Client-side state and adaptive length. \\
+Formal evaluation report & Not yet implemented & Requires benchmark data and metrics. \\
+\bottomrule
+\end{longtable}
+
+\section{Testing and Verification}
+
+The repository includes tests for:
+
+\begin{itemize}[leftmargin=*]
+  \item PDF extraction and OCR fallback;
+  \item image parsing;
+  \item document routing;
+  \item document and transcript chunking;
+  \item ingestion pipeline routing;
+  \item transcript metadata preservation;
+  \item access-control-related behavior;
+  \item storage and retrieval helper behavior.
+\end{itemize}
+
+The changed Python files were syntax-checked with
+\texttt{python -m compileall}. Whitespace validation passed with
+\texttt{git diff --check}. In the development environment used for this
+documentation, \texttt{pytest} was not installed and the frontend
+\texttt{node\_modules} directory was unavailable, so the complete test suite,
+frontend lint, and frontend production build could not be executed there.
+
+Before deployment, the database migration
+\texttt{db/prisma/migrations/0004\_resource\_processing\_status/migration.sql}
+must be applied to the Supabase database.
+
+\subsection{Ingestion System Evaluation}
+
+The repository now includes a reproducible retrieval evaluation harness under
+\texttt{ingestion/evaluation}. The labeled fixture set covers:
+
+\begin{itemize}[leftmargin=*]
+  \item a page-cited PDF question;
+  \item a timestamp-cited video question;
+  \item an authorized community-resource question;
+  \item a private-document isolation case.
+\end{itemize}
+
+Run the evaluation from the repository root with:
+
+\begin{lstlisting}[language=bash]
+python -m ingestion.evaluation.evaluate_retrieval --top-k 5
+\end{lstlisting}
+
+The runner temporarily indexes the fixture corpus, reports Recall@k, mean
+reciprocal rank, source-metadata accuracy, unsupported-query context count,
+and unauthorized-retrieval count, and removes the fixture records in a
+\texttt{finally} block. It therefore does not intentionally leave benchmark
+records in the persistent Chroma collection. The fixture set is a baseline
+evaluation and should be expanded with course-specific and multimodal cases
+before reporting final system results.
+
+\section{Known Limitations}
+
+\begin{enumerate}[leftmargin=*]
+  \item Streaming chat currently emits token events and completion events, but
+        citation-event delivery is not yet fully aligned with the frontend
+        citation contract.
+  \item The quiz frontend can request questions without first performing
+        topic-based permission-scoped retrieval.
+  \item Community discovery is partly remembered in browser local storage
+        rather than being fully reconstructed from a backend membership list.
+  \item PDF and image OCR text is preserved, but exact visual text coordinates
+        are not generated by the ingestion pipeline.
+  \item Retrieval failures should be distinguished more clearly from an empty
+        retrieval result.
+  \item Standalone ingestion storage helpers and backend upload routes contain
+        overlapping storage logic and should eventually be consolidated.
+  \item Formal measurements for grounding, assessment quality, personalization,
+        latency, and deletion consistency are not yet reported.
+\end{enumerate}
+
+\section{Recommended Evaluation Plan}
+
+To evaluate the system rigorously, create a labeled test set with the
+following fields:
+
+\begin{lstlisting}[language=json,caption={Suggested evaluation record}]
+{
+  "id": "video-001",
+  "question": "What is the purpose of the learning rate?",
+  "topic": "gradient descent",
+  "answerable": true,
+  "expected_sources": [
+    {"file": "lecture.mp4", "start_time": "02:15"}
+  ],
+  "expected_concepts": ["step size", "parameter update"]
+}
+\end{lstlisting}
+
+Recommended metrics are:
+
+\begin{itemize}[leftmargin=*]
+  \item Retrieval Recall@1, Recall@3, Recall@5, and MRR;
+  \item citation precision and citation recall;
+  \item grounded-answer faithfulness;
+  \item unsupported-query refusal rate;
+  \item quiz correctness, source support, topic relevance, and duplicate rate;
+  \item learner accuracy and mastery change across simulated quiz runs;
+  \item upload-to-index latency, query latency, and failure rate;
+  \item deletion consistency across database, Storage, and ChromaDB.
+\end{itemize}
+
+Results should include a baseline, the improved system, examples of failures,
+and known limitations. A small, reproducible test set is preferable to an
+unverified accuracy claim.
+
+\section{Recommended Next Steps}
+
+\begin{enumerate}[leftmargin=*]
+  \item Apply and verify the resource-processing database migration.
+  \item Add integration tests for upload, indexing, deletion, and re-query.
+  \item Complete server-side topic retrieval for grounded quizzes.
+  \item Align streaming citation events with the frontend contract.
+  \item Add explicit unsupported-query refusal tests.
+  \item Run simulated learner experiments and report mastery gains.
+  \item Add a backend endpoint for listing all user communities.
+  \item Consolidate duplicate Storage/upload helper logic.
+  \item Run frontend lint/build after installing the frontend dependencies.
+  \item Record a demo showing upload, citation navigation, adaptive practice,
+        unsupported-query refusal, and deletion from the knowledge base.
+\end{enumerate}
+
+\section{Conclusion}
+
+The current project has a strong multimodal RAG foundation. It already
+supports extraction from documents, images, and videos; source-aware
+chunking; hybrid permission-scoped retrieval; Supabase Storage; citation
+navigation; and adaptive quiz interfaces. The newly added deletion lifecycle
+keeps the persistent knowledge index consistent when an uploaded resource is
+removed.
+
+The highest-value remaining work is not model fine-tuning. It is completing
+grounded quiz retrieval, making streaming citations fully reliable, and
+producing a rigorous evaluation report with measurable grounding and learner
+improvement results.
+
+\end{document}
