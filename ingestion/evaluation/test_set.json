@@ -1,0 +1,60 @@
+[
+  {
+    "id": "gradient-descent-pdf",
+    "query": "What does gradient descent use to update model parameters?",
+    "user_id": "evaluation-owner",
+    "community_ids": [],
+    "expected_document_ids": ["eval-gradient-descent"],
+    "expected_sources": [
+      {
+        "file_name": "gradient_descent.pdf",
+        "page_number": 12,
+        "start_time": null,
+        "end_time": null
+      }
+    ],
+    "answerable": true
+  },
+  {
+    "id": "backprop-video",
+    "query": "When does the lecture explain the chain rule in backpropagation?",
+    "user_id": "evaluation-owner",
+    "community_ids": [],
+    "expected_document_ids": ["eval-backprop-video"],
+    "expected_sources": [
+      {
+        "file_name": "backpropagation.mp4",
+        "page_number": null,
+        "start_time": 135.0,
+        "end_time": 172.0
+      }
+    ],
+    "answerable": true
+  },
+  {
+    "id": "community-linear-algebra",
+    "query": "What do vectors and matrices represent in linear algebra?",
+    "user_id": "evaluation-member",
+    "community_ids": ["eval-math-community"],
+    "expected_document_ids": ["eval-linear-algebra"],
+    "expected_sources": [
+      {
+        "file_name": "linear_algebra_notes.pdf",
+        "page_number": 4,
+        "start_time": null,
+        "end_time": null
+      }
+    ],
+    "answerable": true
+  },
+  {
+    "id": "private-document-isolation",
+    "query": "What is photosynthesis?",
+    "user_id": "evaluation-member",
+    "community_ids": ["eval-math-community"],
+    "expected_document_ids": [],
+    "expected_sources": [],
+    "forbidden_document_ids": ["eval-private-photosynthesis"],
+    "answerable": false
+  }
+]
